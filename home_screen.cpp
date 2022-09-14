@@ -31,12 +31,12 @@
 #include "home_screen.h"
 
 rppicomidi::Home_screen::Home_screen(View_manager& view_manager_, Mono_graphics& screen_, 
-                            const char* device_label_, Setup_menu& setup_menu_) :
+                            const char* device_label_, uint8_t num_cables_in_, uint8_t num_cables_out_) :
     View{screen_, screen_.get_clip_rect()},
     view_manager{view_manager_}, label_font{screen.get_font_12()},
-    setup_menu{setup_menu_}
+    menu{screen, static_cast<uint8_t>(label_font.height*2+4), label_font}
 {
-    set_device_label(device_label_);
+    set_connected_device(device_label_, num_cables_in_, num_cables_out_);
 }
 
 void rppicomidi::Home_screen::center_text(const char* text_, uint8_t y_)
@@ -97,12 +97,34 @@ void rppicomidi::Home_screen::draw()
 rppicomidi::Home_screen::Select_result rppicomidi::Home_screen::on_select()
 {
     printf("setup menu requested\r\n");
-    view_manager.push_view(&setup_menu);
-    return new_view; // the top of the view stack should remain unchanged
+    return no_op; // TODO
 }
 
-void rppicomidi::Home_screen::set_device_label(const char* device_label_)
+void rppicomidi::Home_screen::set_connected_device(const char* device_label_, uint8_t num_in_cables_, uint8_t num_out_cables_)
 {
     strncpy(device_label, device_label_, max_device_label);
     device_label[max_device_label] = '\0';
+    draw();
+    num_in_cables = num_in_cables_;
+    num_out_cables = num_out_cables_;
+    for (uint8_t cable=0; cable < num_in_cables; cable++)
+        midi_in_setup.emplace_back(Midi_processing_setup_screen{screen, Rectangle{0,0,screen.get_screen_width(), screen.get_screen_height()}, cable, true});
+    for (uint8_t cable=0; cable < num_out_cables; cable++)
+        midi_out_setup.emplace_back(Midi_processing_setup_screen{screen, Rectangle{0,0,screen.get_screen_width(), screen.get_screen_height()}, cable, false});
+    printf("New connection %s %u IN %u OUT\r\n", device_label, num_in_cables, num_out_cables);
+    if (num_in_cables !=0 || num_out_cables !=0) {
+        for (int port=0; port<num_in_cables; port++) {
+            char line[max_line_length+1];
+            sprintf(line,"Setup MIDI IN %u", port+1);
+            Menu_item* item = new View_launch_menu_item(midi_in_setup.at(port),line, screen, label_font);
+            menu.add_menu_item(item);
+        }
+        for (int port=0; port<num_out_cables; port++) {
+            char line[max_line_length+1];
+            sprintf(line,"Setup MIDI OUT %u", port+1);
+            Menu_item* item = new View_launch_menu_item(midi_out_setup.at(port),line, screen, label_font);
+            menu.add_menu_item(item);
+        }
+        view_manager.push_view(&menu);
+    }
 }

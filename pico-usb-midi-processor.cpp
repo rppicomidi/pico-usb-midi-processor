@@ -21,7 +21,7 @@
 #include "usb_descriptors.h"
 #include "midi_filter.h"
 #include "settings_file.h"
-#include "setup_menu.h"
+//#include "setup_menu.h"
 #include "home_screen.h"
 #include "nav_buttons.h"
 
@@ -66,7 +66,7 @@ public:
     View_manager oled_view_manager; // the view manager object
     Midi_processor_model model;
     Settings_file settings_file;
-    Setup_menu setup_menu;          // the setup menu object
+    //Setup_menu setup_menu;          // the setup menu object
     uint8_t midi_dev_addr;  // The device address of the connected device
     enum {MIDI_DEVICE_NOT_INITIALIZED, MIDI_DEVICE_NEEDS_INIT, MIDI_DEVICE_IS_INITIALIZED} midi_device_status;
 
@@ -86,10 +86,10 @@ rppicomidi::Pico_usb_midi_processor::Pico_usb_midi_processor()  : addr{OLED_ADDR
     ssd1306{&i2c_driver_oled, 0, Ssd1306::Com_pin_cfg::ALT_DIS, 128, 64, 0, 0}, // set up the SSD1306 to drive at 128 x 64 oled
     oled_screen{&ssd1306, Display_rotation::Landscape180},                        // set up the screen for rotated landscape orientation
     settings_file{model},
-    setup_menu{oled_screen, oled_screen.get_clip_rect(), model, settings_file},
+    //setup_menu{oled_screen, oled_screen.get_clip_rect(), model, settings_file},
     midi_dev_addr{0},
     midi_device_status{MIDI_DEVICE_NOT_INITIALIZED},
-    home_screen{oled_view_manager, oled_screen, "PICO MIDI PROCESSOR No Connected Device", setup_menu},
+    home_screen{oled_view_manager, oled_screen, "PICO MIDI PROCESSOR No Connected Device", 0, 0},
     nav_buttons{oled_view_manager}
 {
     gpio_init(LED_GPIO);
@@ -289,7 +289,7 @@ void rppicomidi::Pico_usb_midi_processor::clone_complete_cb()
     if (len > 0) {
         char prod[len+1];
         get_product_string(prod, len+1);
-        home_screen.set_device_label(prod);
+        home_screen.set_connected_device(prod, tuh_midi_get_num_tx_cables(midi_dev_addr), tuh_midi_get_num_rx_cables(midi_dev_addr));
         home_screen.draw();
     }
 }

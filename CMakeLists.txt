@@ -27,7 +27,7 @@ target_sources(${target_name} PRIVATE
  midi_mc_fader_pickup.c
  midi_processor_model.cpp
  settings_file.cpp
- setup_menu.cpp
+ #setup_menu.cpp
  home_screen.cpp
  ${PICO_PIO_USB_SRC}/pio_usb.c
  ${PICO_PIO_USB_SRC}/pio_usb_device.c
