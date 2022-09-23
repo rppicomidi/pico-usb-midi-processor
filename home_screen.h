@@ -26,6 +26,7 @@
  */
 
 #pragma once
+#include "pico/mutex.h"
 #include "mono_graphics_lib.h"
 #include "view_manager.h"
 #include "menu.h"
@@ -35,21 +36,18 @@ namespace rppicomidi {
 class Home_screen : public View
 {
 public:
-    /**
-     * @brief Construct a new Home_screen object
-     * 
-     * @param screen_ 
-     * @param device_label_ A pointer to the initial device label string
-     * @param num_in_cables_ The number of virtual MIDI IN cables of the connected device
-     * @param num_out_cables_ The number of virtual MIDI_OUT cables of the connected device
-     */
-    Home_screen(View_manager& view_manager_, Mono_graphics& screen_,
-                const char* device_label_, uint8_t num_cables_in_, uint8_t num_cables_out_);
+
+    Home_screen(View_manager& view_manager_, Mono_graphics& screen_, mutex& processor_mutex_,
+                std::vector<std::vector<Midi_processor*>>& midi_in_processors_,
+                std::vector<std::vector<Midi_processor*>>& midi_out_processors_,
+                 Midi_processor_factory& factory_, const char* device_label_);
 
     virtual ~Home_screen()=default;
 
     void draw() final;
-    Select_result on_select() final;
+    Select_result on_select(View** new_view) final;
+    void on_increment(uint32_t delta) final {menu.on_increment(delta); };
+    void on_decrement(uint32_t delta) final {menu.on_decrement(delta); };
 
     /**
      * @brief set the device_label string to the new value
@@ -65,17 +63,20 @@ private:
     // Get rid of default constructor and copy constructor
     Home_screen() = delete;
     Home_screen(Home_screen&) = delete;
-    void center_text(const char* text_, uint8_t y_);
+
     View_manager& view_manager;
+    mutex& processor_mutex;
+    std::vector<std::vector<Midi_processor*>>& midi_in_processors;
+    std::vector<std::vector<Midi_processor*>>& midi_out_processors;
+    Midi_processor_factory& factory;
     const Mono_mono_font& label_font;
     Menu menu;
-    std::vector<View_launch_menu_item*> menu_items;
     static const uint8_t max_line_length = 21;
     static const uint8_t max_device_label = max_line_length * 2;
     char device_label[max_device_label+1];
     uint8_t num_in_cables;
     uint8_t num_out_cables;
-    std::vector<Midi_processing_setup_screen> midi_in_setup;
-    std::vector<Midi_processing_setup_screen> midi_out_setup;
+    std::vector<Midi_processing_setup_screen*> midi_in_setup;
+    std::vector<Midi_processing_setup_screen*> midi_out_setup;
 };
 }

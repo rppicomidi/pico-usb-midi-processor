@@ -1,10 +1,12 @@
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
+#include <cstdlib>
+#include <cstdio>
+#include <cstring>
+#include <vector>
 
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
+#include "pico/mutex.h"
 #include "pico/bootrom.h"
 
 #include "mono_graphics_lib.h"
@@ -19,11 +21,14 @@
 #include "class/midi/midi_host.h"
 #include "class/midi/midi_device.h"
 #include "usb_descriptors.h"
-#include "midi_filter.h"
+//#include "midi_filter.h"
 #include "settings_file.h"
 //#include "setup_menu.h"
 #include "home_screen.h"
 #include "nav_buttons.h"
+#include "midi_processor.h"
+#include "midi_processor_mc_fader_pickup.h"
+#include "midi_processor_factory.h"
 
 namespace rppicomidi {
 class Pico_usb_midi_processor {
@@ -47,8 +52,20 @@ public:
     Pico_usb_midi_processor();
     void task();
     void clone_complete_cb();
-    //const char* get_button_name(uint8_t button_map);
-    //void poll_buttons_task(void);
+    void build_processor_structures();
+    void poll_midi_dev_rx();
+    void poll_midi_host_rx();
+
+    /**
+     * @brief process a packet from the MIDI device connected to the PICO PIO USB host port
+     * 
+     * @param packet the packet to process (may be changed by the filtering process)
+     * @return true pass the packet through to the Pico USB device port
+     * @return false pass drop the packet
+     */
+    bool filter_midi_in(uint8_t* packet);
+    bool filter_midi_out(uint8_t* packet);
+    std::vector<Midi_processor*> processors_with_tasks;
     const uint LED_GPIO=PICO_DEFAULT_LED_PIN;
     const uint8_t OLED_ADDR=0x3c;   // the OLED I2C address as a constant
     uint8_t addr[1];                // the OLED I2C address is stored here
@@ -57,7 +74,11 @@ public:
     const uint8_t OLED_SCL_GPIO = 19;   // The OLED SCL pin
     const uint8_t OLED_SDA_GPIO = 18;   // The OLED SDA pin
 
-
+    std::vector<std::vector<Midi_processor*>> midi_in_processors;    // Midi_processor objects for data from the MIDI device connected to the host port
+    std::vector<std::vector<Midi_processor*>> midi_out_processors;   // Midi_processor objects for data to the MIDI device  connected to the host port
+    std::vector<std::vector<Midi_processor_fn>> midi_in_proc_fns;       // processing functions for data from the MIDI device connected to the host port
+    std::vector<std::vector<Midi_processor_fn>> midi_out_proc_fns;      // processing functions for data to the MIDI device connected to the host port
+    Midi_processor_factory factory;
     // the i2c driver object
     Ssd1306i2c i2c_driver_oled{i2c1, addr, OLED_SDA_GPIO, OLED_SCL_GPIO, sizeof(addr), MUX_ADDR, mux_map};
 
@@ -77,21 +98,24 @@ public:
     }
     Home_screen home_screen;
     Nav_buttons nav_buttons;
+    mutex processing_mutex; // to prevent changing MIDI processor data structures in core 0 while core 1 is executing
 };
 }
 
 uint16_t rppicomidi::Pico_usb_midi_processor::render_done_mask = 0;
 
 rppicomidi::Pico_usb_midi_processor::Pico_usb_midi_processor()  : addr{OLED_ADDR},
+    factory{midi_in_processors, midi_out_processors, midi_in_proc_fns, midi_out_proc_fns, processors_with_tasks},
     ssd1306{&i2c_driver_oled, 0, Ssd1306::Com_pin_cfg::ALT_DIS, 128, 64, 0, 0}, // set up the SSD1306 to drive at 128 x 64 oled
     oled_screen{&ssd1306, Display_rotation::Landscape180},                        // set up the screen for rotated landscape orientation
     settings_file{model},
     //setup_menu{oled_screen, oled_screen.get_clip_rect(), model, settings_file},
     midi_dev_addr{0},
     midi_device_status{MIDI_DEVICE_NOT_INITIALIZED},
-    home_screen{oled_view_manager, oled_screen, "PICO MIDI PROCESSOR No Connected Device", 0, 0},
+    home_screen{oled_view_manager, oled_screen, processing_mutex, midi_in_processors, midi_out_processors, factory, "PICO MIDI PROCESSOR No Connected Device"},
     nav_buttons{oled_view_manager}
 {
+    mutex_init(&processing_mutex);
     gpio_init(LED_GPIO);
     gpio_set_dir(LED_GPIO, GPIO_OUT);
 
@@ -131,13 +155,49 @@ rppicomidi::Pico_usb_midi_processor::Pico_usb_midi_processor()  : addr{OLED_ADDR
     assert(success);
 }
 
-static void poll_midi_dev_rx(bool connected)
+
+bool rppicomidi::Pico_usb_midi_processor::filter_midi_in(uint8_t packet[4])
+{
+    bool donotfilter = true;
+    uint8_t cable = Midi_processor::get_cable_num(packet);
+    mutex_enter_blocking(&processing_mutex);
+    if (midi_in_proc_fns.size() > cable) {
+        for (auto& process: midi_in_proc_fns[cable]) {
+            if (process.is_feedback)
+                donotfilter = process.proc->feedback(packet);
+            else
+                donotfilter = process.proc->process(packet);
+            if (!donotfilter)
+                break;
+        }
+    }
+    mutex_exit(&processing_mutex);
+    return donotfilter;
+}
+
+
+bool rppicomidi::Pico_usb_midi_processor::filter_midi_out(uint8_t packet[4])
+{
+    bool donotfilter = true;
+    uint8_t cable = Midi_processor::get_cable_num(packet);
+    mutex_enter_blocking(&processing_mutex);
+    if (midi_out_proc_fns.size() > cable) {
+        for (auto& process: midi_out_proc_fns[cable]) {
+            if (process.is_feedback)
+                donotfilter = process.proc->feedback(packet);
+            else
+                donotfilter = process.proc->process(packet);
+            if (!donotfilter)
+                break;
+        }
+    }
+    mutex_exit(&processing_mutex);
+    return donotfilter;
+}
+
+void rppicomidi::Pico_usb_midi_processor::poll_midi_dev_rx()
 {
   // device must be attached and have at least one endpoint ready to receive a message
-  if (!connected)
-  {
-    return;
-  }
   uint8_t packet[4];
   while (tud_midi_packet_read(packet))
   {
@@ -146,9 +206,8 @@ static void poll_midi_dev_rx(bool connected)
   }
 }
 
-static void poll_midi_host_rx(void)
+void rppicomidi::Pico_usb_midi_processor::poll_midi_host_rx(void)
 {
-  uint8_t midi_dev_addr = rppicomidi::Pico_usb_midi_processor::instance().midi_dev_addr;
   // device must be attached and have at least one endpoint ready to receive a message
   if (!midi_dev_addr  || !tuh_midi_configured(midi_dev_addr))
   {
@@ -173,7 +232,7 @@ static void midi_host_app_task(void)
     clone_next_string();
   }
   else if (descriptors_are_cloned()) {
-    poll_midi_host_rx();
+    rppicomidi::Pico_usb_midi_processor::instance().poll_midi_host_rx();
     tuh_midi_stream_flush(rppicomidi::Pico_usb_midi_processor::instance().midi_dev_addr );
   }
 }
@@ -207,8 +266,12 @@ void rppicomidi::Pico_usb_midi_processor::task()
     }
     else if (midi_device_status == MIDI_DEVICE_IS_INITIALIZED) {
       tud_task();
-      bool connected = tud_midi_mounted();
-      poll_midi_dev_rx(connected);
+      if (tud_midi_mounted()) {
+        poll_midi_dev_rx();
+        for (auto& process_task: processors_with_tasks) {
+            process_task->task();
+        }
+      }
     }
     
     nav_buttons.poll();
@@ -232,55 +295,58 @@ void rppicomidi::Pico_usb_midi_processor::task()
     }
 }
 
-#if 0
-const char* rppicomidi::Pico_usb_midi_processor::get_button_name(uint8_t button_map)
-{
-  for (int bit = 0; bit < 7; bit++) {
-    uint8_t mask = 1 << bit;
-    if (mask & button_map) {
-      uint8_t button = bit + 6;
-      switch (button) {
-        case BUTTON_UP:
-          return "UP";
-        case BUTTON_DOWN:
-          return "DOWN";
-        case BUTTON_LEFT:
-          return "LEFT";
-        case BUTTON_RIGHT:
-          return "RIGHT";
-        case BUTTON_HOME:
-          return "HOME";
-        case BUTTON_BACK:
-          return "BACK";
-        case BUTTON_ENTER:
-          return "ENTER";
-        default:
-          return "UNKNONW";
-      }
-    }
-  }
-  return "UNKNOWN";
-}
-
-void rppicomidi::Pico_usb_midi_processor::poll_buttons_task(void)
-{
-  static uint8_t prev_buttons = 0;
-  uint8_t buttons = (uint8_t)(~(gpio_get_all() >> 6) & 0x7f);
-  if (buttons != prev_buttons) {
-    printf("buttons=%02x\r\n",buttons);
-    if (buttons) {
-      printf("button=%s\r\n", get_button_name(buttons));
-    }
-    prev_buttons = buttons;
-  }
-}
-#endif
-
 void device_clone_complete_cb()
 {
   rppicomidi::Pico_usb_midi_processor::instance().clone_complete_cb();
 }
 
+#if 0
+void rppicomidi::Pico_usb_midi_processor::build_processor_structures()
+{
+    // erase all data structures associated with the processor lists
+    for (size_t cable=0; cable < midi_in_processors.size(); cable++) {
+        midi_in_proc_fns[cable].clear();
+    }
+    for (size_t cable=0; cable < midi_out_processors.size(); cable++) {
+        midi_out_proc_fns[cable].clear();
+    }
+    processors_with_tasks.clear();
+
+    // for each MIDI IN cable, add access to the process() method to the
+    // MIDI IN processor function list for the cable #. If necessary,
+    // add acess to the feedback() method to the MIDI OUT processor 
+    // function list for the cable # and add the task() method the
+    // background task list.
+    for (size_t cable=0; cable < midi_in_processors.size(); cable++) {
+        for (auto& midi_in_proc: midi_in_processors[cable]) {
+            midi_in_proc_fns[cable].push_back(Midi_processor_fn{midi_in_proc, false});
+            if (midi_in_proc->has_feedback_process() && cable < midi_out_proc_fns.size()) {
+                midi_out_proc_fns[cable].push_back(Midi_processor_fn{midi_in_proc, true});
+            }
+            if (midi_in_proc->has_task()) {
+                processors_with_tasks.push_back(midi_in_proc);
+            }
+        }
+    }
+
+    // for each MIDI OUT cable, add access to the process() method to the
+    // MIDI OUT processor function list for the cable #. If necessary,
+    // add acess to the feedback() method to the MIDI IN processor 
+    // function list for the cable # and add the task() method the
+    // background task list.
+    for (size_t cable=0; cable < midi_out_processors.size(); cable++) {
+        for (auto& midi_out_proc: midi_out_processors[cable]) {
+            midi_out_proc_fns[cable].push_back(Midi_processor_fn{midi_out_proc, false});
+            if (midi_out_proc->has_feedback_process() && cable < midi_in_proc_fns.size()) {
+                midi_in_proc_fns[cable].push_back(Midi_processor_fn{midi_out_proc, true});
+            }
+            if (midi_out_proc->has_task()) {
+                processors_with_tasks.push_back(midi_out_proc);
+            }
+        }
+    }
+}
+#endif
 
 void rppicomidi::Pico_usb_midi_processor::clone_complete_cb()
 {
@@ -290,6 +356,23 @@ void rppicomidi::Pico_usb_midi_processor::clone_complete_cb()
         char prod[len+1];
         get_product_string(prod, len+1);
         home_screen.set_connected_device(prod, tuh_midi_get_num_tx_cables(midi_dev_addr), tuh_midi_get_num_rx_cables(midi_dev_addr));
+        for (int cable = 0; cable < tuh_midi_get_num_tx_cables(midi_dev_addr); cable++) {
+            midi_in_processors.push_back(std::vector<Midi_processor*>());
+            midi_in_proc_fns.push_back(std::vector<Midi_processor_fn>());
+        }
+        for (int cable = 0; cable < tuh_midi_get_num_rx_cables(midi_dev_addr); cable++) {
+            midi_out_processors.push_back(std::vector<Midi_processor*>());
+            midi_out_proc_fns.push_back(std::vector<Midi_processor_fn>());
+        }
+        #if 0
+        // TODO Recall the processing setup from flash. For now, set up a fixed processing flow to test the system
+        //midi_in_processors[1].emplace_back(new Midi_processor_mc_fader_pickup{next_processor_unique_id++, 0x7f});        
+        Midi_processor_factory factory;
+        auto new_proc = factory.get_new_midi_processor_by_idx(0);
+        assert(new_proc != nullptr);
+        midi_in_processors[1].push_back(new_proc);
+        build_processor_structures();
+        #endif
         home_screen.draw();
     }
 }
@@ -313,10 +396,9 @@ int main() {
   multicore_launch_core1(core1_main);
 
   TU_LOG1("pico-usb-midi-processor\r\n");
-  filter_midi_init();
   while (1)
   {
-    instance_ptr->task();
+        instance_ptr->task();
   }
 
   return 0;
@@ -327,10 +409,7 @@ int main() {
 //--------------------------------------------------------------------+
 
 // Invoked when device with hid interface is mounted
-// Report descriptor is also available for use. tuh_hid_parse_report_descriptor()
-// can be used to parse common/simple enough descriptor.
-// Note: if report descriptor length > CFG_TUH_ENUMERATION_BUFSIZE, it will be skipped
-// therefore report_desc = NULL, desc_len = 0
+// Report descriptor is also available for use. 
 void tuh_midi_mount_cb(uint8_t dev_addr, uint8_t in_ep, uint8_t out_ep, uint8_t num_cables_rx, uint16_t num_cables_tx)
 {
   TU_LOG1("MIDI device address = %u, IN endpoint %u has %u cables, OUT endpoint %u has %u cables\r\n",
@@ -358,7 +437,7 @@ void tuh_midi_rx_cb(uint8_t dev_addr, uint32_t num_packets)
       uint8_t packet[4];
       if (tuh_midi_packet_read(dev_addr, packet))
       {
-        if (filter_midi_in(packet))
+        if (rppicomidi::Pico_usb_midi_processor::instance().filter_midi_in(packet))
           tud_midi_packet_write(packet);
       }
     }

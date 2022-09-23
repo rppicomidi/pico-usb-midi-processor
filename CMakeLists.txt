@@ -23,12 +23,14 @@ target_sources(${target_name} PRIVATE
 # midi_app.c
  pico-usb-midi-processor.cpp
  usb_descriptors.c
- keylab_essential_mc_filter.c
- midi_mc_fader_pickup.c
+ #keylab_essential_mc_filter.c
+ midi_processor_mc_fader_pickup.cpp
+ midi_processor_transpose.cpp
  midi_processor_model.cpp
  settings_file.cpp
- #setup_menu.cpp
  home_screen.cpp
+ midi_processor_factory.cpp
+ midi_processing_setup_screen.cpp
  ${PICO_PIO_USB_SRC}/pio_usb.c
  ${PICO_PIO_USB_SRC}/pio_usb_device.c
  ${PICO_PIO_USB_SRC}/pio_usb_host.c
@@ -48,6 +50,6 @@ PICO_DEFAULT_UART_RX_PIN=17
 target_include_directories(${target_name} PRIVATE ${PICO_PIO_USB_SRC} ${CMAKE_CURRENT_LIST_DIR} ${CMAKE_CURRENT_LIST_DIR}/ext_lib/parson)
 
 target_link_libraries(${target_name} PRIVATE pico_stdlib pico_multicore hardware_pio hardware_dma tinyusb_device tinyusb_host 
-ssd1306 ssd1306i2c text_box mono_graphics_lib ui_menu ui_view_manager ui_nav_buttons littlefs-lib)
+ssd1306 ssd1306i2c text_box mono_graphics_lib ui_menu ui_view_manager ui_nav_buttons ui_text_item_chooser littlefs-lib)
 pico_add_extra_outputs(${target_name})
 

@@ -30,22 +30,19 @@
 #include <cstdio>
 #include "home_screen.h"
 
-rppicomidi::Home_screen::Home_screen(View_manager& view_manager_, Mono_graphics& screen_, 
-                            const char* device_label_, uint8_t num_cables_in_, uint8_t num_cables_out_) :
+rppicomidi::Home_screen::Home_screen(View_manager& view_manager_, Mono_graphics& screen_, mutex& processor_mutex_,
+    std::vector<std::vector<Midi_processor*>>& midi_in_processors_,
+    std::vector<std::vector<Midi_processor*>>& midi_out_processors_,
+    Midi_processor_factory& factory_, const char* device_label_) :
     View{screen_, screen_.get_clip_rect()},
-    view_manager{view_manager_}, label_font{screen.get_font_12()},
+    view_manager{view_manager_}, processor_mutex{processor_mutex_},
+    midi_in_processors{midi_in_processors_}, midi_out_processors{midi_out_processors_},
+    factory{factory_}, label_font{screen.get_font_12()},
     menu{screen, static_cast<uint8_t>(label_font.height*2+4), label_font}
 {
-    set_connected_device(device_label_, num_cables_in_, num_cables_out_);
+    set_connected_device(device_label_, midi_in_processors.size(), midi_out_processors.size());
 }
 
-void rppicomidi::Home_screen::center_text(const char* text_, uint8_t y_)
-{
-    auto text_len = strlen(text_);
-    int x = screen.get_screen_width()/2 - (text_len*label_font.width)/2;
-    screen.draw_string(label_font, x, y_, text_, text_len, Pixel_state::PIXEL_ONE, Pixel_state::PIXEL_ZERO);
-
-}
 
 void rppicomidi::Home_screen::draw()
 {
@@ -54,7 +51,7 @@ void rppicomidi::Home_screen::draw()
         auto device_label_len = strlen(device_label);
         if (device_label_len <= max_line_length) {
             // Center the Produce String on the 2nd line of the screen
-            center_text(device_label, label_font.height);
+            screen.center_string(label_font, device_label, label_font.height);
         }
         else {
             // Break the device_label string into two lines.
@@ -83,48 +80,50 @@ void rppicomidi::Home_screen::draw()
                 }                
             }
             if (center) {
-                center_text(line1, 0);
-                center_text(line2, label_font.height);
+                screen.center_string(label_font, line1, 0);
+                screen.center_string(label_font, line2, label_font.height);
             }
             else {
                 screen.draw_string(label_font, 0, 0, line1, strlen(line1), Pixel_state::PIXEL_ONE, Pixel_state::PIXEL_ZERO);
                 screen.draw_string(label_font, 0, label_font.height, line2, strlen(line2), Pixel_state::PIXEL_ONE, Pixel_state::PIXEL_ZERO);
             }
         }
+        menu.draw();
     }
 }
 
-rppicomidi::Home_screen::Select_result rppicomidi::Home_screen::on_select()
+rppicomidi::Home_screen::Select_result rppicomidi::Home_screen::on_select(View** new_view)
 {
-    printf("setup menu requested\r\n");
-    return no_op; // TODO
+    return menu.on_select(new_view);
 }
 
 void rppicomidi::Home_screen::set_connected_device(const char* device_label_, uint8_t num_in_cables_, uint8_t num_out_cables_)
 {
+    // Draw the product string
     strncpy(device_label, device_label_, max_device_label);
     device_label[max_device_label] = '\0';
-    draw();
     num_in_cables = num_in_cables_;
     num_out_cables = num_out_cables_;
     for (uint8_t cable=0; cable < num_in_cables; cable++)
-        midi_in_setup.emplace_back(Midi_processing_setup_screen{screen, Rectangle{0,0,screen.get_screen_width(), screen.get_screen_height()}, cable, true});
+        midi_in_setup.push_back(new Midi_processing_setup_screen{screen, label_font, processor_mutex, factory, midi_in_processors[cable], cable, true});
     for (uint8_t cable=0; cable < num_out_cables; cable++)
-        midi_out_setup.emplace_back(Midi_processing_setup_screen{screen, Rectangle{0,0,screen.get_screen_width(), screen.get_screen_height()}, cable, false});
+        midi_out_setup.push_back(new Midi_processing_setup_screen{screen, label_font, processor_mutex, factory, midi_out_processors[cable], cable, false});
     printf("New connection %s %u IN %u OUT\r\n", device_label, num_in_cables, num_out_cables);
     if (num_in_cables !=0 || num_out_cables !=0) {
         for (int port=0; port<num_in_cables; port++) {
             char line[max_line_length+1];
             sprintf(line,"Setup MIDI IN %u", port+1);
-            Menu_item* item = new View_launch_menu_item(midi_in_setup.at(port),line, screen, label_font);
+            Menu_item* item = new View_launch_menu_item(*midi_in_setup.at(port),line, screen, label_font);
             menu.add_menu_item(item);
         }
         for (int port=0; port<num_out_cables; port++) {
             char line[max_line_length+1];
             sprintf(line,"Setup MIDI OUT %u", port+1);
-            Menu_item* item = new View_launch_menu_item(midi_out_setup.at(port),line, screen, label_font);
+            Menu_item* item = new View_launch_menu_item(*midi_out_setup.at(port),line, screen, label_font);
             menu.add_menu_item(item);
         }
-        view_manager.push_view(&menu);
+        // Treat the menu as a sub-view of this view. Do not change view.
+        menu.entry();
+        draw();
     }
 }
