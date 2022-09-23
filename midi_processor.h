@@ -98,7 +98,7 @@ public:
      * @return false
      * @note usually there is no feedback process;
      */
-    virtual bool feedback(uint8_t packet[4]) {(void)packet; return false;}
+    virtual bool feedback(uint8_t* packet) {(void)packet; return false;}
 
     /**
      * @brief determine if this process has a periodic process task

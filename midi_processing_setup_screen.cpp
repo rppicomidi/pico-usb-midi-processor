@@ -1,5 +1,6 @@
 #include <cstdio>
 #include "midi_processing_setup_screen.h"
+#include "midi_processor_manager.h"
 
 rppicomidi::Midi_processing_setup_screen::Midi_processing_setup_screen(Mono_graphics& screen_, const Mono_mono_font& font_, 
         uint8_t cable_num_, bool is_midi_in_) :
@@ -7,9 +8,9 @@ rppicomidi::Midi_processing_setup_screen::Midi_processing_setup_screen(Mono_grap
         menu{screen_, font.height, font},
         processor_select{screen_, font.height, this, select_callback}
 {
-    size_t num_processors = Midi_processor_factory::instance().get_num_midi_processor_types();
+    size_t num_processors = Midi_processor_manager::instance().get_num_midi_processor_types();
     for (size_t idx = 0; idx < num_processors; idx++) {
-        auto item = new Menu_item{Midi_processor_factory::instance().get_midi_processor_name_by_idx(idx), screen, font};
+        auto item = new Menu_item{Midi_processor_manager::instance().get_midi_processor_name_by_idx(idx), screen, font};
         assert(item);
         processor_select.add_menu_item(item);
     }
@@ -37,7 +38,7 @@ void rppicomidi::Midi_processing_setup_screen::select_callback(rppicomidi::View*
     auto me = reinterpret_cast<Midi_processing_setup_screen*>(view);
     // TODO need to push a View_launch_menu_item with settings for each MIDI processor object, not just text selection
     me->menu.insert_menu_item_before_current(new Menu_item(me->processor_select.get_menu_item_text(idx), me->screen, me->font));
-    Midi_processor_factory::instance().add_new_midi_processor_by_idx(idx, me->cable_num, me->is_midi_in);
+    Midi_processor_manager::instance().add_new_midi_processor_by_idx(idx, me->cable_num, me->is_midi_in);
 }
 
 rppicomidi::View::Select_result rppicomidi::Midi_processing_setup_screen::on_select(View** new_view)

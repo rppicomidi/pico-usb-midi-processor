@@ -29,7 +29,7 @@ target_sources(${target_name} PRIVATE
  midi_processor_model.cpp
  settings_file.cpp
  home_screen.cpp
- midi_processor_factory.cpp
+ midi_processor_manager.cpp
  midi_processing_setup_screen.cpp
  ${PICO_PIO_USB_SRC}/pio_usb.c
  ${PICO_PIO_USB_SRC}/pio_usb_device.c

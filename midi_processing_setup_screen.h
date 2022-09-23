@@ -5,8 +5,6 @@
 #include "menu.h"
 #include "view_launch_menu_item.h"
 #include "text_item_chooser_menu.h"
-#include "midi_processor_factory.h"
-#include "midi_processor.h"
 namespace rppicomidi
 {
 class Midi_processing_setup_screen : public View

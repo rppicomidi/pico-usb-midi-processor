@@ -40,7 +40,7 @@
 #include "pico/mutex.h"
 namespace rppicomidi
 {
-class Midi_processor_factory
+class Midi_processor_manager
 {
 public:
     typedef Midi_processor* (*factory_fn)(uint16_t unique_id);
@@ -53,19 +53,19 @@ public:
      *
      * @return the singleton instance
      */
-    static Midi_processor_factory& instance()
+    static Midi_processor_manager& instance()
     {
-        static Midi_processor_factory _instance;    // Guaranteed to be destroyed.
+        static Midi_processor_manager _instance;    // Guaranteed to be destroyed.
                                                     // Instantiated on first use.
         return _instance;
     }
-    Midi_processor_factory(Midi_processor_factory const&) = delete;
-    void operator=(Midi_processor_factory const&) = delete;
+    Midi_processor_manager(Midi_processor_manager const&) = delete;
+    void operator=(Midi_processor_manager const&) = delete;
 
     /**
-     * @brief Construct a new Midi_processor_factory object
+     * @brief Construct a new Midi_processor_manager object
      */
-    Midi_processor_factory();
+    Midi_processor_manager();
 
     /**
      * @brief Get the number of MIDI Processor types

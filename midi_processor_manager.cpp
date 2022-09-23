@@ -1,8 +1,8 @@
-#include "midi_processor_factory.h"
+#include "midi_processor_manager.h"
 #include "midi_processor_mc_fader_pickup.h"
 #include "midi_processor_transpose.h"
-uint16_t rppicomidi::Midi_processor_factory::unique_id = 0;
-rppicomidi::Midi_processor_factory::Midi_processor_factory()
+uint16_t rppicomidi::Midi_processor_manager::unique_id = 0;
+rppicomidi::Midi_processor_manager::Midi_processor_manager()
 {
     // Note: try to add new processor types to this list alphabetically
     mutex_init(&processing_mutex);
@@ -10,7 +10,7 @@ rppicomidi::Midi_processor_factory::Midi_processor_factory()
     proclist.push_back({Midi_processor_transpose::static_getname(), Midi_processor_transpose::static_make_new});
 }
 
-void rppicomidi::Midi_processor_factory::set_connected_device(uint16_t vid_, uint16_t pid_, uint8_t num_in_cables_, uint8_t num_out_cables_)
+void rppicomidi::Midi_processor_manager::set_connected_device(uint16_t vid_, uint16_t pid_, uint8_t num_in_cables_, uint8_t num_out_cables_)
 {
     // TODO: use vid_ and pid_ to generate settings file name and recall settings on device connect if settings exist
     (void)vid_;
@@ -25,7 +25,7 @@ void rppicomidi::Midi_processor_factory::set_connected_device(uint16_t vid_, uin
     }
 }
 
-void rppicomidi::Midi_processor_factory::add_new_midi_processor_by_idx(size_t idx, uint8_t cable, bool is_midi_in)
+void rppicomidi::Midi_processor_manager::add_new_midi_processor_by_idx(size_t idx, uint8_t cable, bool is_midi_in)
 {
     if (idx < proclist.size()) {
         auto proc = proclist[idx].processor(unique_id++);
@@ -41,7 +41,7 @@ void rppicomidi::Midi_processor_factory::add_new_midi_processor_by_idx(size_t id
     }
 }
 
-void rppicomidi::Midi_processor_factory::build_processor_structures()
+void rppicomidi::Midi_processor_manager::build_processor_structures()
 {
     // erase all data structures associated with the processor lists
     for (size_t cable=0; cable < midi_in_processors.size(); cable++) {
@@ -87,7 +87,7 @@ void rppicomidi::Midi_processor_factory::build_processor_structures()
     }
 }
 
-bool rppicomidi::Midi_processor_factory::filter_midi_in(uint8_t cable, uint8_t* packet)
+bool rppicomidi::Midi_processor_manager::filter_midi_in(uint8_t cable, uint8_t* packet)
 {
     bool donotfilter = true;
     //uint8_t cable = Midi_processor::get_cable_num(packet);
@@ -107,7 +107,7 @@ bool rppicomidi::Midi_processor_factory::filter_midi_in(uint8_t cable, uint8_t* 
 }
 
 
-bool rppicomidi::Midi_processor_factory::filter_midi_out(uint8_t cable, uint8_t* packet)
+bool rppicomidi::Midi_processor_manager::filter_midi_out(uint8_t cable, uint8_t* packet)
 {
     bool donotfilter = true;
     //uint8_t cable = Midi_processor::get_cable_num(packet);
@@ -126,7 +126,7 @@ bool rppicomidi::Midi_processor_factory::filter_midi_out(uint8_t cable, uint8_t*
     return donotfilter;
 }
 
-void rppicomidi::Midi_processor_factory::task()
+void rppicomidi::Midi_processor_manager::task()
 {
     mutex_enter_blocking(&processing_mutex);
     for (auto& proc: processors_with_tasks) {
