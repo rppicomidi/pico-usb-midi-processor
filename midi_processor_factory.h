@@ -37,6 +37,7 @@
 #pragma once
 #include <vector>
 #include "midi_processor.h"
+#include "pico/mutex.h"
 namespace rppicomidi
 {
 class Midi_processor_factory
@@ -44,14 +45,27 @@ class Midi_processor_factory
 public:
     typedef Midi_processor* (*factory_fn)(uint16_t unique_id);
 
+public:
+    // Singleton Pattern
+
+    /**
+     * @brief Get the Instance object
+     *
+     * @return the singleton instance
+     */
+    static Midi_processor_factory& instance()
+    {
+        static Midi_processor_factory _instance;    // Guaranteed to be destroyed.
+                                                    // Instantiated on first use.
+        return _instance;
+    }
+    Midi_processor_factory(Midi_processor_factory const&) = delete;
+    void operator=(Midi_processor_factory const&) = delete;
+
     /**
      * @brief Construct a new Midi_processor_factory object
      */
-    Midi_processor_factory(std::vector<std::vector<Midi_processor*>>& midi_in_processors_,
-                    std::vector<std::vector<Midi_processor*>>& midi_out_processors_,
-                    std::vector<std::vector<Midi_processor_fn>>& midi_in_proc_fns_,
-                    std::vector<std::vector<Midi_processor_fn>>& midi_out_proc_fns_,
-                    std::vector<Midi_processor*>& processors_with_tasks_);
+    Midi_processor_factory();
 
     /**
      * @brief Get the number of MIDI Processor types
@@ -73,31 +87,34 @@ public:
         return nullptr;
     }
 
-    /**
-     * @brief Get the new midi processor by idx object
-     * 
-     * @param idx the processor number, from 0. Must be < get_num_midi_processor_types()
-     * @return Midi_processor* 
-     */
-    Midi_processor* get_new_midi_processor_by_idx(size_t idx)
-    {
-        if (idx < proclist.size())
-            return proclist[idx].processor(unique_id++);
-        return nullptr;
-    }
+    void add_new_midi_processor_by_idx(size_t idx, uint8_t cable, bool is_midi_in);
 
-    void build_processor_structures();
+    void set_connected_device(uint16_t vid_, uint16_t pid_, uint8_t num_in_cables_, uint8_t num_out_cables_);
+
+    bool filter_midi_in(uint8_t cable_, uint8_t* packet_);
+    bool filter_midi_out(uint8_t cable_, uint8_t* packet_);
+    void task();
 private:
+    /**
+     * @brief rebuild the midi_in_proc_fns midi_out_proc_fns and processors_with_tasks
+     * vectors.
+     *
+     * Call this function after either midi_in_processors or midi_out_processors change.
+     * Call this with the processing_mutex locked.
+     */
+    void build_processor_structures();
+
     struct Mpf_element {
         const char* name;
         factory_fn processor;
     };
     std::vector<Mpf_element> proclist;
     static uint16_t unique_id;
-    std::vector<std::vector<Midi_processor*>>& midi_in_processors;
-    std::vector<std::vector<Midi_processor*>>& midi_out_processors;
-    std::vector<std::vector<Midi_processor_fn>>& midi_in_proc_fns;
-    std::vector<std::vector<Midi_processor_fn>>& midi_out_proc_fns;
-    std::vector<Midi_processor*>& processors_with_tasks;
+    mutex processing_mutex;
+    std::vector<std::vector<Midi_processor*>> midi_in_processors;
+    std::vector<std::vector<Midi_processor*>> midi_out_processors;
+    std::vector<std::vector<Midi_processor_fn>> midi_in_proc_fns;
+    std::vector<std::vector<Midi_processor_fn>> midi_out_proc_fns;
+    std::vector<Midi_processor*> processors_with_tasks;
 };
 }

@@ -316,3 +316,22 @@ uint8_t get_product_string_length(void)
   }
   return len;
 }
+
+uint16_t get_vid()
+{
+    uint16_t vid = 0;
+    if (clone_state == CLONED) {
+        vid = desc_device_connected.idVendor;
+    }
+    return vid;
+}
+
+uint16_t get_pid()
+{
+    uint16_t pid = 0;
+    if (clone_state == CLONED) {
+        pid = desc_device_connected.idProduct;
+    }
+    return pid;
+}
+

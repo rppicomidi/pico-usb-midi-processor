@@ -37,10 +37,7 @@ class Home_screen : public View
 {
 public:
 
-    Home_screen(View_manager& view_manager_, Mono_graphics& screen_, mutex& processor_mutex_,
-                std::vector<std::vector<Midi_processor*>>& midi_in_processors_,
-                std::vector<std::vector<Midi_processor*>>& midi_out_processors_,
-                 Midi_processor_factory& factory_, const char* device_label_);
+    Home_screen(View_manager& view_manager_, Mono_graphics& screen_, const char* device_label_);
 
     virtual ~Home_screen()=default;
 
@@ -65,10 +62,6 @@ private:
     Home_screen(Home_screen&) = delete;
 
     View_manager& view_manager;
-    mutex& processor_mutex;
-    std::vector<std::vector<Midi_processor*>>& midi_in_processors;
-    std::vector<std::vector<Midi_processor*>>& midi_out_processors;
-    Midi_processor_factory& factory;
     const Mono_mono_font& label_font;
     Menu menu;
     static const uint8_t max_line_length = 21;

@@ -16,7 +16,7 @@ public:
     void set_transpose_delta(int8_t delta_) {transpose_delta = delta_; }
     int8_t get_transpose_delta() {return transpose_delta; }
     static const char* static_getname() { return "Transpose"; }
-    static Midi_processor* make_new(uint16_t unique_id_) {return new Midi_processor_transpose(unique_id_); }
+    static Midi_processor* static_make_new(uint16_t unique_id_) {return new Midi_processor_transpose(unique_id_); }
 protected:
     uint8_t chan;
     uint8_t min_note;

@@ -28,6 +28,9 @@ bool get_product_string(char* prodstr, uint8_t max_prodstr);
 
 uint8_t get_product_string_length(void);
 
+uint16_t get_vid();
+uint16_t get_pid();
+
 TU_ATTR_WEAK void device_clone_complete_cb(void);
 #ifdef __cplusplus
 }

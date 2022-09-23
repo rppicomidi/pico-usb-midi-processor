@@ -30,17 +30,13 @@
 #include <cstdio>
 #include "home_screen.h"
 
-rppicomidi::Home_screen::Home_screen(View_manager& view_manager_, Mono_graphics& screen_, mutex& processor_mutex_,
-    std::vector<std::vector<Midi_processor*>>& midi_in_processors_,
-    std::vector<std::vector<Midi_processor*>>& midi_out_processors_,
-    Midi_processor_factory& factory_, const char* device_label_) :
+rppicomidi::Home_screen::Home_screen(View_manager& view_manager_, Mono_graphics& screen_, const char* device_label_) :
     View{screen_, screen_.get_clip_rect()},
-    view_manager{view_manager_}, processor_mutex{processor_mutex_},
-    midi_in_processors{midi_in_processors_}, midi_out_processors{midi_out_processors_},
-    factory{factory_}, label_font{screen.get_font_12()},
-    menu{screen, static_cast<uint8_t>(label_font.height*2+4), label_font}
+    view_manager{view_manager_}, label_font{screen.get_font_12()},
+    menu{screen, static_cast<uint8_t>(label_font.height*2+4), label_font},
+    num_in_cables{0}, num_out_cables{0}
 {
-    set_connected_device(device_label_, midi_in_processors.size(), midi_out_processors.size());
+    set_connected_device(device_label_, num_in_cables, num_out_cables);
 }
 
 
@@ -105,9 +101,9 @@ void rppicomidi::Home_screen::set_connected_device(const char* device_label_, ui
     num_in_cables = num_in_cables_;
     num_out_cables = num_out_cables_;
     for (uint8_t cable=0; cable < num_in_cables; cable++)
-        midi_in_setup.push_back(new Midi_processing_setup_screen{screen, label_font, processor_mutex, factory, midi_in_processors[cable], cable, true});
+        midi_in_setup.push_back(new Midi_processing_setup_screen{screen, label_font, cable, true});
     for (uint8_t cable=0; cable < num_out_cables; cable++)
-        midi_out_setup.push_back(new Midi_processing_setup_screen{screen, label_font, processor_mutex, factory, midi_out_processors[cable], cable, false});
+        midi_out_setup.push_back(new Midi_processing_setup_screen{screen, label_font, cable, false});
     printf("New connection %s %u IN %u OUT\r\n", device_label, num_in_cables, num_out_cables);
     if (num_in_cables !=0 || num_out_cables !=0) {
         for (int port=0; port<num_in_cables; port++) {

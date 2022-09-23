@@ -74,11 +74,6 @@ public:
     const uint8_t OLED_SCL_GPIO = 19;   // The OLED SCL pin
     const uint8_t OLED_SDA_GPIO = 18;   // The OLED SDA pin
 
-    std::vector<std::vector<Midi_processor*>> midi_in_processors;    // Midi_processor objects for data from the MIDI device connected to the host port
-    std::vector<std::vector<Midi_processor*>> midi_out_processors;   // Midi_processor objects for data to the MIDI device  connected to the host port
-    std::vector<std::vector<Midi_processor_fn>> midi_in_proc_fns;       // processing functions for data from the MIDI device connected to the host port
-    std::vector<std::vector<Midi_processor_fn>> midi_out_proc_fns;      // processing functions for data to the MIDI device connected to the host port
-    Midi_processor_factory factory;
     // the i2c driver object
     Ssd1306i2c i2c_driver_oled{i2c1, addr, OLED_SDA_GPIO, OLED_SCL_GPIO, sizeof(addr), MUX_ADDR, mux_map};
 
@@ -105,14 +100,13 @@ public:
 uint16_t rppicomidi::Pico_usb_midi_processor::render_done_mask = 0;
 
 rppicomidi::Pico_usb_midi_processor::Pico_usb_midi_processor()  : addr{OLED_ADDR},
-    factory{midi_in_processors, midi_out_processors, midi_in_proc_fns, midi_out_proc_fns, processors_with_tasks},
     ssd1306{&i2c_driver_oled, 0, Ssd1306::Com_pin_cfg::ALT_DIS, 128, 64, 0, 0}, // set up the SSD1306 to drive at 128 x 64 oled
     oled_screen{&ssd1306, Display_rotation::Landscape180},                        // set up the screen for rotated landscape orientation
     settings_file{model},
     //setup_menu{oled_screen, oled_screen.get_clip_rect(), model, settings_file},
     midi_dev_addr{0},
     midi_device_status{MIDI_DEVICE_NOT_INITIALIZED},
-    home_screen{oled_view_manager, oled_screen, processing_mutex, midi_in_processors, midi_out_processors, factory, "PICO MIDI PROCESSOR No Connected Device"},
+    home_screen{oled_view_manager, oled_screen, "PICO MIDI PROCESSOR No Connected Device"},
     nav_buttons{oled_view_manager}
 {
     mutex_init(&processing_mutex);
@@ -155,7 +149,7 @@ rppicomidi::Pico_usb_midi_processor::Pico_usb_midi_processor()  : addr{OLED_ADDR
     assert(success);
 }
 
-
+#if 0
 bool rppicomidi::Pico_usb_midi_processor::filter_midi_in(uint8_t packet[4])
 {
     bool donotfilter = true;
@@ -194,16 +188,18 @@ bool rppicomidi::Pico_usb_midi_processor::filter_midi_out(uint8_t packet[4])
     mutex_exit(&processing_mutex);
     return donotfilter;
 }
+#endif
 
 void rppicomidi::Pico_usb_midi_processor::poll_midi_dev_rx()
 {
-  // device must be attached and have at least one endpoint ready to receive a message
-  uint8_t packet[4];
-  while (tud_midi_packet_read(packet))
-  {
-    if (filter_midi_out(packet))
-      tuh_midi_packet_write(rppicomidi::Pico_usb_midi_processor::instance().midi_dev_addr, packet);
-  }
+    // device must be attached and have at least one endpoint ready to receive a message
+    uint8_t packet[4];
+    while (tud_midi_packet_read(packet)) {
+        uint8_t cable = Midi_processor::get_cable_num(packet);
+        if (Midi_processor_factory::instance().filter_midi_out(cable, packet)) {
+            tuh_midi_packet_write(rppicomidi::Pico_usb_midi_processor::instance().midi_dev_addr, packet);
+        }
+    }
 }
 
 void rppicomidi::Pico_usb_midi_processor::poll_midi_host_rx(void)
@@ -355,7 +351,11 @@ void rppicomidi::Pico_usb_midi_processor::clone_complete_cb()
     if (len > 0) {
         char prod[len+1];
         get_product_string(prod, len+1);
-        home_screen.set_connected_device(prod, tuh_midi_get_num_tx_cables(midi_dev_addr), tuh_midi_get_num_rx_cables(midi_dev_addr));
+        uint8_t num_in_cables = tuh_midi_get_num_tx_cables(midi_dev_addr);
+        uint8_t num_out_cables = tuh_midi_get_num_rx_cables(midi_dev_addr);
+        home_screen.set_connected_device(prod, num_in_cables, num_out_cables);
+        Midi_processor_factory::instance().set_connected_device(get_vid(), get_pid(), num_in_cables, num_out_cables);
+        #if 0
         for (int cable = 0; cable < tuh_midi_get_num_tx_cables(midi_dev_addr); cable++) {
             midi_in_processors.push_back(std::vector<Midi_processor*>());
             midi_in_proc_fns.push_back(std::vector<Midi_processor_fn>());
@@ -364,7 +364,6 @@ void rppicomidi::Pico_usb_midi_processor::clone_complete_cb()
             midi_out_processors.push_back(std::vector<Midi_processor*>());
             midi_out_proc_fns.push_back(std::vector<Midi_processor_fn>());
         }
-        #if 0
         // TODO Recall the processing setup from flash. For now, set up a fixed processing flow to test the system
         //midi_in_processors[1].emplace_back(new Midi_processor_mc_fader_pickup{next_processor_unique_id++, 0x7f});        
         Midi_processor_factory factory;
@@ -429,19 +428,18 @@ void tuh_midi_umount_cb(uint8_t dev_addr, uint8_t instance)
 
 void tuh_midi_rx_cb(uint8_t dev_addr, uint32_t num_packets)
 {
-  if (rppicomidi::Pico_usb_midi_processor::instance().midi_dev_addr == dev_addr)
-  {
-    while (num_packets>0)
-    {
-      --num_packets;
-      uint8_t packet[4];
-      if (tuh_midi_packet_read(dev_addr, packet))
-      {
-        if (rppicomidi::Pico_usb_midi_processor::instance().filter_midi_in(packet))
-          tud_midi_packet_write(packet);
-      }
+    if (rppicomidi::Pico_usb_midi_processor::instance().midi_dev_addr == dev_addr) {
+        while (num_packets>0) {
+            --num_packets;
+            uint8_t packet[4];
+            if (tuh_midi_packet_read(dev_addr, packet)) {
+                uint8_t cable = rppicomidi::Midi_processor::get_cable_num(packet);
+                if (rppicomidi::Midi_processor_factory::instance().filter_midi_in(cable, packet)) {
+                    tud_midi_packet_write(packet);
+                }
+            }
+        }
     }
-  }
 }
 
 void tuh_midi_tx_cb(uint8_t dev_addr)

@@ -143,7 +143,7 @@ public:
 
     // The following are manditory static methods to enable the Midi_processor_factory class
     static const char* static_getname() { return "MC Fader Pickup"; }
-    static Midi_processor* make_new(uint16_t unique_id) { return new Midi_processor_mc_fader_pickup(unique_id); }
+    static Midi_processor* static_make_new(uint16_t unique_id) { return new Midi_processor_mc_fader_pickup(unique_id); }
 private:
     static const uint8_t num_faders=9;
     Mc_fader_pickup faders[num_faders];
