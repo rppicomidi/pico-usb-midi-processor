@@ -25,10 +25,10 @@
 
 #include "midi_processor_mc_fader_pickup.h"
 #include <stdio.h>
-void rppicomidi::Mc_fader_pickup::init(uint16_t sync_delta)
+void rppicomidi::Mc_fader_pickup::init(uint16_t sync_delta_)
 {
     state = MC_FADER_PICKUP_RESET;
-    sync_delta = sync_delta;
+    sync_delta = sync_delta_;
     daw = 0;
     fader = 0; 
 }
@@ -58,7 +58,6 @@ bool rppicomidi::Mc_fader_pickup::set_daw_fader_value(uint16_t daw_fader_value)
         default: // both DAW fader value and Hardware fader value are known
         {
             int16_t delta = (int16_t)daw_fader_value - (int16_t)fader;
-            daw = daw_fader_value;
             uint16_t abs_delta = delta;
             if (delta < 0)
                 abs_delta = -delta;
@@ -77,6 +76,7 @@ bool rppicomidi::Mc_fader_pickup::set_daw_fader_value(uint16_t daw_fader_value)
         }
     }
     state = next_state;
+    daw = daw_fader_value;
     return is_synchronized();
 }
 

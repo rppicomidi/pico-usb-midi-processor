@@ -16,6 +16,7 @@ public:
     static void select_callback(View* me, int& idx);
     virtual void entry();
     Select_result on_select(View** new_view) final;
+    void on_left(uint32_t delta) final; // delete the selected element
     void on_increment(uint32_t delta) final {menu.on_increment(delta); };
     void on_decrement(uint32_t delta) final {menu.on_decrement(delta); };
 private:

@@ -123,6 +123,7 @@ rppicomidi::Pico_usb_midi_processor::Pico_usb_midi_processor()  : addr{OLED_ADDR
     int num_displays = 1;
     uint16_t target_done_mask = (1<<(num_displays)) -1;
     bool success = true;
+    Midi_processor_manager::instance().set_screen(&oled_screen);
     oled_view_manager.push_view(&home_screen);
     oled_screen.render_non_blocking(callback, 0);
     while (success && render_done_mask != target_done_mask) {
@@ -156,6 +157,49 @@ void rppicomidi::Pico_usb_midi_processor::poll_midi_host_rx(void)
     }
     tuh_midi_read_poll(midi_dev_addr); // if there is data, then the callback will be called
 }
+
+
+
+void rppicomidi::Pico_usb_midi_processor::task()
+{
+    if (midi_device_status == MIDI_DEVICE_NEEDS_INIT) {
+        tud_init(0);
+        TU_LOG1("MIDI device initialized\r\n");
+        midi_device_status = MIDI_DEVICE_IS_INITIALIZED;
+    }
+    else if (midi_device_status == MIDI_DEVICE_IS_INITIALIZED) {
+        tud_task();
+        if (tud_midi_mounted()) {
+            poll_midi_dev_rx();
+            Midi_processor_manager::instance().task();
+        }
+    }
+
+    nav_buttons.poll();
+    if (oled_screen.can_render()) {
+        oled_screen.render_non_blocking(nullptr, 0);
+    }
+    oled_screen.task();
+
+    // flash the Pico board LED
+    static absolute_time_t previous_timestamp = {0};
+
+    static bool led_state = false;
+
+    absolute_time_t now = get_absolute_time();
+    
+    int64_t diff = absolute_time_diff_us(previous_timestamp, now);
+    if (diff > 1000000) {
+        gpio_put(rppicomidi::Pico_usb_midi_processor::instance().LED_GPIO, led_state);
+        led_state = !led_state;
+        previous_timestamp = now;
+    }
+}
+
+//
+// Below here are standard C code functions that glue the Pico SDK and
+// tinyusb to the C++ code.
+//
 
 static void midi_host_app_task(void)
 {
@@ -195,42 +239,6 @@ void core1_main()
     }
 }
 
-void rppicomidi::Pico_usb_midi_processor::task()
-{
-    if (midi_device_status == MIDI_DEVICE_NEEDS_INIT) {
-        tud_init(0);
-        TU_LOG1("MIDI device initialized\r\n");
-        midi_device_status = MIDI_DEVICE_IS_INITIALIZED;
-    }
-    else if (midi_device_status == MIDI_DEVICE_IS_INITIALIZED) {
-        tud_task();
-        if (tud_midi_mounted()) {
-            poll_midi_dev_rx();
-            Midi_processor_manager::instance().task();
-        }
-    }
-
-    nav_buttons.poll();
-    if (oled_screen.can_render()) {
-        oled_screen.render_non_blocking(nullptr, 0);
-    }
-    oled_screen.task();
-
-    // flash the Pico board LED
-    static absolute_time_t previous_timestamp = {0};
-
-    static bool led_state = false;
-
-    absolute_time_t now = get_absolute_time();
-    
-    int64_t diff = absolute_time_diff_us(previous_timestamp, now);
-    if (diff > 1000000) {
-        gpio_put(rppicomidi::Pico_usb_midi_processor::instance().LED_GPIO, led_state);
-        led_state = !led_state;
-        previous_timestamp = now;
-    }
-}
-
 void device_clone_complete_cb()
 {
     rppicomidi::Pico_usb_midi_processor::instance().clone_complete_cb();
@@ -252,7 +260,8 @@ void rppicomidi::Pico_usb_midi_processor::clone_complete_cb()
 }
 
 // core0: handle device events
-int main() {
+int main()
+{
     // default 125MHz is not appropreate. Sysclock should be multiple of 12MHz.
     set_sys_clock_khz(120000, true);
 

@@ -36,16 +36,30 @@ void rppicomidi::Midi_processing_setup_screen::draw()
 void rppicomidi::Midi_processing_setup_screen::select_callback(rppicomidi::View* view, int& idx)
 {
     auto me = reinterpret_cast<Midi_processing_setup_screen*>(view);
-    // TODO need to push a View_launch_menu_item with settings for each MIDI processor object, not just text selection
-    me->menu.insert_menu_item_before_current(new Menu_item(me->processor_select.get_menu_item_text(idx), me->screen, me->font));
-    Midi_processor_manager::instance().add_new_midi_processor_by_idx(idx, me->cable_num, me->is_midi_in);
+    auto newview = Midi_processor_manager::instance().add_new_midi_processor_by_idx(idx, me->cable_num, me->is_midi_in);
+    me->menu.insert_menu_item_before_current(new View_launch_menu_item(*newview, me->processor_select.get_menu_item_text(idx), me->screen, me->font));
 }
 
 rppicomidi::View::Select_result rppicomidi::Midi_processing_setup_screen::on_select(View** new_view)
 {
     int idx = menu.get_current_item_idx();
-    if (idx == static_cast<int>(menu.get_num_items())-1)
+    if (idx <= static_cast<int>(menu.get_num_items())-1) {
         return menu.on_select(new_view);
-    printf("Selecting processor %s for edit or move\r\n", menu.get_menu_item_text(idx));
+    }
     return Select_result::no_op;
+}
+
+void rppicomidi::Midi_processing_setup_screen::on_left(uint32_t delta)
+{
+    if (delta > 1) {
+        // Don't want to delete too many things at one go
+        return;
+    }
+    int idx = menu.get_current_item_idx();
+    if (idx == -1 || idx == static_cast<int>(menu.get_num_items())-1) {
+        return; // either the menu is empty (which is bad) or pointing to the add new item menu item
+    }
+    Midi_processor_manager::instance().delete_midi_processor_by_idx(idx, cable_num, is_midi_in);
+    menu.erase_current_item();
+    menu.draw();
 }

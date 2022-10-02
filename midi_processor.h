@@ -48,6 +48,8 @@ public:
         }
     }
 
+    virtual ~Midi_processor() = default;
+
     /**
      * @brief Get the unique id object
      * 
@@ -128,22 +130,24 @@ public:
     /**
      * @brief Serialize the settings for this process in JSON format
      *
-     * @param settings_string the settings for this process in JSON format
-     * @param max_settings_string is the maximum number of characters
-     * that can be written to settings_string
-     * @return true if the serialization is successful
+     * @return a pointer to the newly allocated serialized settings
      * @note calling this function clears the dirty flag
      */
-    bool serialize_settings(char* settings_string);
+    virtual char* serialize_settings() {return nullptr; };
 
     /**
      * @brief load the JSON formatted settings to the processor
      * 
      * @param settings_string the JSON formatted settings string for this processor
      * @return true if deserialization is successful
+     * @note clears the dirty flag if deserialization was successful
      */
-    bool deserialize_settings(const char* settings_string);
+    virtual bool deserialize_settings(const char* settings_string) {(void)settings_string; return false; };
 
+    /**
+     * @brief load the default settings for this processor
+     */
+    virtual void load_defaults() {}
     /**
      * @brief
      * 
@@ -171,21 +175,12 @@ public:
         }
         return channel;
     }
+
 protected:
     static const uint8_t max_name_length=21;
     char name[max_name_length+1];
     char feedback_name[max_name_length+1];
     bool dirty; // if true, then the settings need to be saved 
     uint16_t unique_id;
-};
-
-/**
- * @brief Midi_processor ptr with a flag to choose whether to call the process() 
- * or feedback() function
- */
-struct Midi_processor_fn
-{   
-    Midi_processor* proc;   //!< pointer to the Midi_processor whose process() or feedback() function is called
-    bool is_feedback;       //!< if true, call proc->feedback(); otherwise call proc->process().
 };
 }

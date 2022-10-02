@@ -37,13 +37,25 @@
 #pragma once
 #include <vector>
 #include "midi_processor.h"
+#include "midi_processor_settings_view.h"
 #include "pico/mutex.h"
+#include "view.h"
 namespace rppicomidi
 {
 class Midi_processor_manager
 {
-public:
-    typedef Midi_processor* (*factory_fn)(uint16_t unique_id);
+private:
+    typedef Midi_processor* (*mp_factory_fn)(uint16_t unique_id);
+    typedef Midi_processor_settings_view* (*mpsv_factory_fn)(Mono_graphics& screen_, const Rectangle& rect_, Midi_processor* proc_);
+    /**
+     * @brief Midi_processor ptr with a flag to choose whether to call the process() 
+     * or feedback() function
+     */
+    struct Midi_processor_fn
+    {   
+        Midi_processor* proc;   //!< pointer to the Midi_processor whose process() or feedback() function is called
+        bool is_feedback;       //!< if true, call proc->feedback(); otherwise call proc->process().
+    };
 
 public:
     // Singleton Pattern
@@ -87,13 +99,65 @@ public:
         return nullptr;
     }
 
-    void add_new_midi_processor_by_idx(size_t idx, uint8_t cable, bool is_midi_in);
+    /**
+     * @brief Add the new MIDI processor created by proclist[idx].processor() to the end of
+     * the processor list for the cable number and direction
+     * 
+     * @param idx specifies the processor with name proclist[idx].name
+     * @param cable is the virtual cable number from 0
+     * @param is_midi_in is true if the processor is for the MIDI IN direction, false for the OUT direction
+     * @return a pointer to the newly added Midi_processor object
+     */
+    Midi_processor_settings_view* add_new_midi_processor_by_idx(size_t idx, uint8_t cable, bool is_midi_in);
 
+    void delete_midi_processor_by_idx(int idx, uint8_t cable, bool is_midi_in);
+
+    /**
+     * @brief Initialize the processor lists for the newly connected device
+     * 
+     * @param vid_ the idVendor of the newly connected MIDI device
+     * @param pid_ the idProduct of the newly connected MIDI device
+     * @param num_in_cables_ the number of virtual MIDI IN cables
+     * @param num_out_cables_ the number of virtual MIDI OUT cables
+     */
     void set_connected_device(uint16_t vid_, uint16_t pid_, uint8_t num_in_cables_, uint8_t num_out_cables_);
 
+    /**
+     * @brief process the MIDI IN packet from the connected device on the specified virtual cable 
+     * 
+     * @param cable_ the USB MIDI virtual cable number. (yes, it is also in the packet; this is for future
+     * when I may switch to streams instead of USB packets)
+     * @param packet_ the 4-byte USB MIDI packet
+     * @return true if the packet should be sent to the Pico's USB device interface
+     * @return false if the packet should be discarded
+     */
     bool filter_midi_in(uint8_t cable_, uint8_t* packet_);
+
+    /**
+     * @brief process the MIDI OUT packet sent to the connected device on the specified virtual cable 
+     * 
+     * @param cable_ the USB MIDI virtual cable number. (yes, it is also in the packet; this is for future
+     * when I may switch to streams instead of USB packets)
+     * @param packet_ the 4-byte USB MIDI packet
+     * @return true if the packet should be sent to the connected MIDI Device
+     * @return false if the packet should be discarded
+     */
     bool filter_midi_out(uint8_t cable_, uint8_t* packet_);
+
+    /**
+     * @brief execute the task() functions for all Midi_processor objects
+     * that have a task() function that does anything
+     */
     void task();
+
+    /**
+     * @brief Set the screen object
+     *
+     * This function must be called before any MIDI processor settings view is created.
+     *
+     * @param screen_ a pointer to the screen that displays the settings
+     */
+    void set_screen(Mono_graphics* screen_) {screen = screen_;}
 private:
     /**
      * @brief rebuild the midi_in_proc_fns midi_out_proc_fns and processors_with_tasks
@@ -106,15 +170,21 @@ private:
 
     struct Mpf_element {
         const char* name;
-        factory_fn processor;
+        mp_factory_fn processor;
+        mpsv_factory_fn view;
     };
     std::vector<Mpf_element> proclist;
     static uint16_t unique_id;
     mutex processing_mutex;
-    std::vector<std::vector<Midi_processor*>> midi_in_processors;
-    std::vector<std::vector<Midi_processor*>> midi_out_processors;
+    struct Mpv_element {
+        Midi_processor* proc;
+        Midi_processor_settings_view* view;
+    };
+    std::vector<std::vector<Mpv_element>> midi_in_processors;
+    std::vector<std::vector<Mpv_element>> midi_out_processors;
     std::vector<std::vector<Midi_processor_fn>> midi_in_proc_fns;
     std::vector<std::vector<Midi_processor_fn>> midi_out_proc_fns;
     std::vector<Midi_processor*> processors_with_tasks;
+    Mono_graphics* screen;
 };
 }

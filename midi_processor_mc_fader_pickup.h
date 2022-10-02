@@ -132,18 +132,19 @@ private:
 class Midi_processor_mc_fader_pickup : public Midi_processor
 {
 public:
-    Midi_processor_mc_fader_pickup(uint16_t unique_id, uint16_t sync_delta=0x7f) : Midi_processor(static_getname(), unique_id)
+    Midi_processor_mc_fader_pickup(uint16_t unique_id_, uint16_t sync_delta_=0x7f) : Midi_processor(static_getname(), unique_id_)
     {
         for (int fader=0; fader< num_faders; fader++)
-            faders[fader].init(sync_delta);
+            faders[fader].init(sync_delta_);
     }
+    virtual ~Midi_processor_mc_fader_pickup()=default;
     bool process(uint8_t* packet) final;
     bool feedback(uint8_t* packet) final;
     bool has_feedback_process() final {return true; }
 
     // The following are manditory static methods to enable the Midi_processor_manager class
     static const char* static_getname() { return "MC Fader Pickup"; }
-    static Midi_processor* static_make_new(uint16_t unique_id) { return new Midi_processor_mc_fader_pickup(unique_id); }
+    static Midi_processor* static_make_new(uint16_t unique_id_) { return new Midi_processor_mc_fader_pickup(unique_id_); }
 private:
     static const uint8_t num_faders=9;
     Mc_fader_pickup faders[num_faders];
