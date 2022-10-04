@@ -77,32 +77,6 @@ public:
         me->dirty = oldval != newval;
         return newval;
     }
-#if 0
-
-    uint8_t get_chan() {return chan.get(); }
-    bool set_note_range(uint8_t min_note_, uint8_t max_note_)
-    {
-        bool success = false;
-        if (min_note.set(min_note_)) {
-            max_note.set_min(min_note_);
-            success = max_note.set(max_note_);
-        }
-        dirty = dirty || success;
-        return success;
-    }
-
-    void get_note_range(uint8_t& min_note_, uint8_t& max_note_)
-    {
-        min_note_ = min_note.get(); max_note_ = max_note.get();
-    }
-
-    bool set_transpose_delta(int8_t delta_)
-    {
-        bool success = transpose_delta.set(delta_);
-        dirty = dirty || success;
-        return success;
-    }
-#endif
 
     int8_t get_transpose_delta() {return transpose_delta.get(); }
     char* serialize_settings() final;

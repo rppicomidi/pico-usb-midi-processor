@@ -1,8 +1,10 @@
 #include "midi_processor_manager.h"
 #include "midi_processor_mc_fader_pickup.h"
 #include "midi_processor_transpose.h"
+#include "midi_processor_chan_mes_remap.h"
 #include "midi_processor_mc_fader_pickup_settings_view.h"
 #include "midi_processor_transpose_view.h"
+#include "midi_processor_chan_mes_remap_settings_view.h"
 uint16_t rppicomidi::Midi_processor_manager::unique_id = 0;
 rppicomidi::Midi_processor_manager::Midi_processor_manager() : screen{nullptr}
 {
@@ -12,6 +14,8 @@ rppicomidi::Midi_processor_manager::Midi_processor_manager() : screen{nullptr}
                         Midi_processor_mc_fader_pickup_settings_view::static_make_new});
     proclist.push_back({Midi_processor_transpose::static_getname(), Midi_processor_transpose::static_make_new,
                         Midi_processor_transpose_view::static_make_new});
+    proclist.push_back({Midi_processor_chan_mes_remap::static_getname(), Midi_processor_chan_mes_remap::static_make_new,
+                        Midi_processor_chan_mes_remap_settings_view::static_make_new});
 }
 
 void rppicomidi::Midi_processor_manager::set_connected_device(uint16_t vid_, uint16_t pid_, uint8_t num_in_cables_, uint8_t num_out_cables_)

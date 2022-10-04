@@ -24,6 +24,11 @@ void rppicomidi::Midi_processing_setup_screen::entry()
     menu.entry();
 }
 
+void rppicomidi::Midi_processing_setup_screen::exit()
+{
+    menu.exit();
+}
+
 void rppicomidi::Midi_processing_setup_screen::draw()
 {
     screen.clear_canvas();

@@ -1,6 +1,5 @@
 #pragma once
 #include <vector>
-#include "pico/mutex.h"
 #include "view.h"
 #include "menu.h"
 #include "view_launch_menu_item.h"
@@ -12,9 +11,10 @@ class Midi_processing_setup_screen : public View
 public:
     Midi_processing_setup_screen(Mono_graphics& screen_, const Mono_mono_font& font_,
         uint8_t cable_num_, bool is_midi_in_);
-    virtual void draw();
+    void draw() final;
     static void select_callback(View* me, int& idx);
-    virtual void entry();
+    void entry() final;
+    void exit() final;
     Select_result on_select(View** new_view) final;
     void on_left(uint32_t delta) final; // delete the selected element
     void on_increment(uint32_t delta) final {menu.on_increment(delta); };

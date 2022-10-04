@@ -28,9 +28,5 @@ public:
     }
 private:
     Menu menu;
-    Int_spinner_menu_item<uint8_t> chan;
-    Int_spinner_menu_item<uint8_t> min_note;
-    Int_spinner_menu_item<uint8_t> max_note;
-    Int_spinner_menu_item<int8_t> transpose_delta;
 };
 }
