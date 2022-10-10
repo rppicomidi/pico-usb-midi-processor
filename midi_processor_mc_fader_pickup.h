@@ -141,7 +141,6 @@ public:
     bool process(uint8_t* packet) final;
     bool feedback(uint8_t* packet) final;
     bool has_feedback_process() final {return true; }
-
     // The following are manditory static methods to enable the Midi_processor_manager class
     static const char* static_getname() { return "MC Fader Pickup"; }
     static Midi_processor* static_make_new(uint16_t unique_id_) { return new Midi_processor_mc_fader_pickup(unique_id_); }

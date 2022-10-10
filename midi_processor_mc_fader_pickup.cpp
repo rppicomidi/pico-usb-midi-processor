@@ -24,6 +24,7 @@
  */
 
 #include "midi_processor_mc_fader_pickup.h"
+#include "parson.h"
 #include <stdio.h>
 void rppicomidi::Mc_fader_pickup::init(uint16_t sync_delta_)
 {

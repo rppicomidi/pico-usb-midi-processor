@@ -100,6 +100,14 @@ public:
     }
 
     /**
+     * @brief Get the midi processor idx by its name
+     * 
+     * @param name the processor name
+     * @return get_num_midi_processor_types() if the name is not found, otherwise the index value
+     */
+    size_t get_midi_processor_idx_by_name(const char* name);
+
+    /**
      * @brief Add the new MIDI processor created by proclist[idx].processor() to the end of
      * the processor list for the cable number and direction
      * 
@@ -110,7 +118,59 @@ public:
      */
     Midi_processor_settings_view* add_new_midi_processor_by_idx(size_t idx, uint8_t cable, bool is_midi_in);
 
+    /**
+     * @brief delete a MIDI processor based on its current index in the processing list
+     * for the given MIDI cable number and direction
+     * 
+     * @param idx location in the midi_processors array
+     * @param cable the USB virtual cable number from 0
+     * @param is_midi_in true if direction is MIDI IN (from the connected device) or MIDI OUT (to the connected device)
+     */
     void delete_midi_processor_by_idx(int idx, uint8_t cable, bool is_midi_in);
+
+    int get_num_midi_processors(uint8_t cable, bool is_midi_in)
+    {
+        int retval = -1;
+        if (is_midi_in && cable < midi_in_processors.size()) {
+            retval = midi_in_processors[cable].size();
+        }
+        else if (!is_midi_in && cable < midi_out_processors.size()) {
+            retval = midi_out_processors[cable].size();
+        }
+        return retval;
+    }
+
+    Midi_processor* get_midi_processor_by_index(size_t idx, uint8_t cable, bool is_midi_in)
+    {
+        Midi_processor* retval = nullptr;
+        if (is_midi_in && cable < midi_in_processors.size()) {
+            if (idx < midi_in_processors[cable].size()) {
+                retval = midi_in_processors[cable][idx].proc;
+            }
+        }
+        else if (!is_midi_in && cable < midi_out_processors.size()) {
+            if (idx < midi_out_processors[cable].size()) {
+                retval = midi_out_processors[cable][idx].proc;
+            }
+        }
+        return retval;
+    }
+
+    Midi_processor_settings_view* get_midi_processor_view_by_index(size_t idx, uint8_t cable, bool is_midi_in)
+    {
+        Midi_processor_settings_view* retval = nullptr;
+        if (is_midi_in && cable < midi_in_processors.size()) {
+            if (idx < midi_in_processors[cable].size()) {
+                retval = midi_in_processors[cable][idx].view;
+            }
+        }
+        else if (!is_midi_in && cable < midi_out_processors.size()) {
+            if (idx < midi_out_processors[cable].size()) {
+                retval = midi_out_processors[cable][idx].view;
+            }
+        }
+        return retval;
+    }
 
     /**
      * @brief Initialize the processor lists for the newly connected device
@@ -158,6 +218,26 @@ public:
      * @param screen_ a pointer to the screen that displays the settings
      */
     void set_screen(Mono_graphics* screen_) {screen = screen_;}
+
+    /**
+     * @brief serialize to a JSON-formatted string the settings
+     * of all processors on all MIDI INs and MIDI OUTs
+     * 
+     * @return char* the serialized string
+     */
+    char* serialize();
+
+    /**
+     * @brief deserialize the JSON-formatted string to the settings
+     * of all processors on all MIDI INs and MIDI OUTs. If a MIDI IN
+     * or MIDI OUT does not have a processor corresponding to the settings,
+     * allocate a new one first
+     *
+     * @param json_format 
+     * @return true if deserialization was successful
+     * @return false if deserialization failed
+     */
+    bool deserialize(char* json_format);
 private:
     /**
      * @brief rebuild the midi_in_proc_fns midi_out_proc_fns and processors_with_tasks

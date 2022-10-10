@@ -1,4 +1,5 @@
 #include <cstdio>
+#include <cstdlib>
 #include "midi_processing_setup_screen.h"
 #include "midi_processor_manager.h"
 
@@ -14,19 +15,33 @@ rppicomidi::Midi_processing_setup_screen::Midi_processing_setup_screen(Mono_grap
         assert(item);
         processor_select.add_menu_item(item);
     }
-    auto item = new View_launch_menu_item(processor_select,"Add new processor...", screen, font);
-    assert(item);
-    menu.add_menu_item(item);
 }
 
 void rppicomidi::Midi_processing_setup_screen::entry()
 {
+    menu.clear();
+    auto item = new View_launch_menu_item(processor_select,"Add new processor...", screen, font);
+    assert(item);
+    menu.add_menu_item(item);
+
+    // Build the current processor list
+    size_t nprocessors = Midi_processor_manager::instance().get_num_midi_processors(cable_num, is_midi_in);
+    for (size_t idx = 0; idx < nprocessors; idx++) {
+        auto proc = Midi_processor_manager::instance().get_midi_processor_by_index(idx, cable_num, is_midi_in);
+        auto newview = Midi_processor_manager::instance().get_midi_processor_view_by_index(idx, cable_num, is_midi_in);
+        if (proc && newview) {
+            auto proc_item = new View_launch_menu_item(*newview, proc->get_name(), screen, font);
+            menu.insert_menu_item_before_current(proc_item);
+            menu.set_current_item_idx(idx+1);
+        }
+    }
     menu.entry();
 }
 
 void rppicomidi::Midi_processing_setup_screen::exit()
 {
     menu.exit();
+    menu.clear();
 }
 
 void rppicomidi::Midi_processing_setup_screen::draw()
@@ -60,11 +75,13 @@ void rppicomidi::Midi_processing_setup_screen::on_left(uint32_t delta)
         // Don't want to delete too many things at one go
         return;
     }
+
     int idx = menu.get_current_item_idx();
     if (idx == -1 || idx == static_cast<int>(menu.get_num_items())-1) {
         return; // either the menu is empty (which is bad) or pointing to the add new item menu item
     }
     Midi_processor_manager::instance().delete_midi_processor_by_idx(idx, cable_num, is_midi_in);
+
     menu.erase_current_item();
     menu.draw();
 }

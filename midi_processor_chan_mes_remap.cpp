@@ -42,3 +42,34 @@ bool rppicomidi::Midi_processor_chan_mes_remap::process_internal(uint8_t* packet
     }
     return donotfilter;
 }
+
+void rppicomidi::Midi_processor_chan_mes_remap::serialize_settings(const char* name, JSON_Object *root_object)
+{
+    JSON_Value *proc_value = json_value_init_object();
+    JSON_Object *proc_object = json_value_get_object(proc_value);
+    chan.serialize(proc_object);
+    message_type.serialize(proc_object);
+    bimap.serialize(proc_object);
+    display_format.serialize(proc_object);
+    json_object_set_value(root_object, name, proc_value);
+    dirty = false;
+}
+
+bool rppicomidi::Midi_processor_chan_mes_remap::deserialize_settings(JSON_Object *root_object)
+{
+    bool result = false;
+    if (chan.deserialize(root_object))
+        result = true;
+
+    if (!result || !message_type.deserialize(root_object))
+        result = false;
+
+    if (!result || !bimap.deserialize(root_object))
+        result = false;
+
+    if (!result || !display_format.deserialize(root_object))
+        result = false;
+    if (result)
+        dirty = false;
+    return result;
+}

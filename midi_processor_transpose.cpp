@@ -22,45 +22,32 @@ bool rppicomidi::Midi_processor_transpose::process(uint8_t* packet)
     return success;
 }
 
-char* rppicomidi::Midi_processor_transpose::serialize_settings()
+void rppicomidi::Midi_processor_transpose::serialize_settings(const char* name, JSON_Object *root_object)
 {
-    char *serialized_string = nullptr;
-    JSON_Value *root_value = json_value_init_object();
-    JSON_Object *root_object = json_value_get_object(root_value);
-    chan.serialize(root_object);
-    min_note.serialize(root_object);
-    max_note.serialize(root_object);
-    transpose_delta.serialize(root_object);
-    json_set_float_serialization_format("%.0f");
-    serialized_string = json_serialize_to_string(root_value);
-    json_value_free(root_value);
+    JSON_Value *proc_value = json_value_init_object();
+    JSON_Object *proc_object = json_value_get_object(proc_value);
+    chan.serialize(proc_object);
+    min_note.serialize(proc_object);
+    max_note.serialize(proc_object);
+    transpose_delta.serialize(proc_object);
+    json_object_set_value(root_object, name, proc_value);
     dirty = false;
-    return serialized_string;
 }
 
-bool rppicomidi::Midi_processor_transpose::deserialize_settings(const char* settings_str)
+bool rppicomidi::Midi_processor_transpose::deserialize_settings(JSON_Object *root_object)
 {
-    JSON_Value *root_value = json_parse_string(settings_str);
-    JSON_Object *root_object = NULL;
     bool result = false;
-    if (root_value && json_value_get_type(root_value) == JSONObject) {
-        root_object = json_value_get_object(root_value);
+    if (chan.deserialize(root_object))
+        result = true;
 
-        if (chan.deserialize(root_object))
-            result = true;
+    if (!result || !min_note.deserialize(root_object))
+        result = false;
 
-        if (!result || !min_note.deserialize(root_object))
-            result = false;
- 
-        if (!result || !max_note.deserialize(root_object))
-            result = false;
+    if (!result || !max_note.deserialize(root_object))
+        result = false;
 
-        if (!result || !transpose_delta.deserialize(root_object))
-            result = false;
-    }
-
-    if (root_value)
-        json_value_free(root_value);
+    if (!result || !transpose_delta.deserialize(root_object))
+        result = false;
     if (result)
         dirty = false;
     return result;

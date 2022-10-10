@@ -30,6 +30,7 @@
 #include <cstdint>
 #include <cstring>
 #include <cstdio>
+#include "parson.h"
 namespace rppicomidi
 {
 class Midi_processor
@@ -127,22 +128,40 @@ public:
      */
     bool not_saved() { return dirty; }
 
+    void set_not_saved() { dirty = true; }
+
     /**
-     * @brief Serialize the settings for this process in JSON format
+     * @brief Add the JSON formatted settings to the root object
      *
-     * @return a pointer to the newly allocated serialized settings
+     * @param name the processor name
+     * @param root_object a pointer to the parson library JSON_Object
+     * containing all processors for this MIDI cable direction
+     * @return a pointer to the newly allocated serialized settings or nullptr
+     * if this method is not implemented in the child class
      * @note calling this function clears the dirty flag
+     * @note if the processor has no settings, the default implementation below will suffice
      */
-    virtual char* serialize_settings() {return nullptr; };
+    virtual void serialize_settings(const char* name, JSON_Object *root_object)
+    {
+        JSON_Value *proc_value = json_value_init_object();
+        json_object_set_value(root_object, name, proc_value);
+        dirty = false;
+    }
 
     /**
      * @brief load the JSON formatted settings to the processor
      * 
-     * @param settings_string the JSON formatted settings string for this processor
+     * @param root_object a pointer to the parson library JSON_Object containing the settings
      * @return true if deserialization is successful
      * @note clears the dirty flag if deserialization was successful
+     * @note if the processor has no settings, the default implementation below will suffice
      */
-    virtual bool deserialize_settings(const char* settings_string) {(void)settings_string; return false; };
+    virtual bool deserialize_settings(JSON_Object *root_object)
+    {
+        (void)root_object;
+        dirty = false;
+        return true;
+    };
 
     /**
      * @brief load the default settings for this processor

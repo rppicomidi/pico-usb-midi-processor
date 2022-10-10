@@ -79,8 +79,8 @@ public:
     }
 
     int8_t get_transpose_delta() {return transpose_delta.get(); }
-    char* serialize_settings() final;
-    bool deserialize_settings(const char* settings_str) final;
+    void serialize_settings(const char* name, JSON_Object *root_object) final;
+    bool deserialize_settings(JSON_Object *root_object) final;
     void load_defaults() final;
 
     // The following are manditory static methods to enable the Midi_processor_manager class
