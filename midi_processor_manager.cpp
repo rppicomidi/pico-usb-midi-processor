@@ -24,6 +24,7 @@
 #include "midi_processor_mc_fader_pickup.h"
 #include "midi_processor_transpose.h"
 #include "midi_processor_chan_mes_remap.h"
+#include "midi_processor_chan_button_remap.h"
 #include "midi_processor_mc_fader_pickup_settings_view.h"
 #include "midi_processor_transpose_view.h"
 #include "midi_processor_chan_mes_remap_settings_view.h"
@@ -38,6 +39,8 @@ rppicomidi::Midi_processor_manager::Midi_processor_manager() : screen{nullptr}
     proclist.push_back({Midi_processor_transpose::static_getname(), Midi_processor_transpose::static_make_new,
                         Midi_processor_transpose_view::static_make_new});
     proclist.push_back({Midi_processor_chan_mes_remap::static_getname(), Midi_processor_chan_mes_remap::static_make_new,
+                        Midi_processor_chan_mes_remap_settings_view::static_make_new});
+    proclist.push_back({Midi_processor_chan_button_remap::static_getname(), Midi_processor_chan_button_remap::static_make_new,
                         Midi_processor_chan_mes_remap_settings_view::static_make_new});
 }
 

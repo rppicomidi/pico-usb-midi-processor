@@ -23,6 +23,18 @@
 
 #include "midi_processor_chan_mes_remap.h"
 #include "class/midi/midi.h"
+rppicomidi::Midi_processor_chan_mes_remap::Midi_processor_chan_mes_remap(const char* name_, uint16_t unique_id) :
+    Midi_processor{name_, unique_id}, note_msg{"Note Number Remap"}, cc_msg{"CC Number Remap"},
+    poly_pressure_msg{"Poly Press Note Remap"}, chan_pressure_msg{"Chan Pressure Remap"}, prog_change_msg{"Program Number Remap"},
+    format_decimal{"Display Decimal"}, format_hex{"Display Hex"},
+    chan{"Channel", 1, 16, 1}, message_type{"Channel Message", {note_msg, cc_msg, poly_pressure_msg, chan_pressure_msg, prog_change_msg}},
+    bimap{"remap",0,128 /* if the remap is 128, it means the message packet should be filtered out */ },
+    display_format{"Display Format", {format_decimal, format_hex}}
+{
+    mutex_init(&processing_mutex);
+}
+
+#if 0
 rppicomidi::Midi_processor_chan_mes_remap::Midi_processor_chan_mes_remap(uint16_t unique_id) :
     Midi_processor{static_getname(), unique_id}, note_msg{"Note Number Remap"}, cc_msg{"CC Number Remap"},
     poly_pressure_msg{"Poly Press Note Remap"}, chan_pressure_msg{"Chan Pressure Remap"}, prog_change_msg{"Program Number Remap"},
@@ -33,6 +45,7 @@ rppicomidi::Midi_processor_chan_mes_remap::Midi_processor_chan_mes_remap(uint16_
 {
     mutex_init(&processing_mutex);
 }
+#endif
 
 bool rppicomidi::Midi_processor_chan_mes_remap::process_internal(uint8_t* packet, size_t first_idx, size_t second_idx)
 {
