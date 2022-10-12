@@ -1,9 +1,9 @@
 #include <cstdio>
 #include <cstdlib>
-#include "midi_processing_setup_screen.h"
+#include "midi_processor_setup_screen.h"
 #include "midi_processor_manager.h"
 
-rppicomidi::Midi_processing_setup_screen::Midi_processing_setup_screen(Mono_graphics& screen_, const Mono_mono_font& font_, 
+rppicomidi::Midi_processor_setup_screen::Midi_processor_setup_screen(Mono_graphics& screen_, const Mono_mono_font& font_, 
         uint8_t cable_num_, bool is_midi_in_) :
         View{screen_, screen_.get_clip_rect()}, font{font_}, cable_num{cable_num_}, is_midi_in{is_midi_in_},
         menu{screen_, font.height, font},
@@ -17,7 +17,7 @@ rppicomidi::Midi_processing_setup_screen::Midi_processing_setup_screen(Mono_grap
     }
 }
 
-void rppicomidi::Midi_processing_setup_screen::entry()
+void rppicomidi::Midi_processor_setup_screen::entry()
 {
     menu.clear();
     auto item = new View_launch_menu_item(processor_select,"Add new processor...", screen, font);
@@ -38,13 +38,13 @@ void rppicomidi::Midi_processing_setup_screen::entry()
     menu.entry();
 }
 
-void rppicomidi::Midi_processing_setup_screen::exit()
+void rppicomidi::Midi_processor_setup_screen::exit()
 {
     menu.exit();
     menu.clear();
 }
 
-void rppicomidi::Midi_processing_setup_screen::draw()
+void rppicomidi::Midi_processor_setup_screen::draw()
 {
     screen.clear_canvas();
     char str[21];
@@ -53,14 +53,14 @@ void rppicomidi::Midi_processing_setup_screen::draw()
     menu.draw();
 }
 
-void rppicomidi::Midi_processing_setup_screen::select_callback(rppicomidi::View* view, int& idx)
+void rppicomidi::Midi_processor_setup_screen::select_callback(rppicomidi::View* view, int& idx)
 {
-    auto me = reinterpret_cast<Midi_processing_setup_screen*>(view);
+    auto me = reinterpret_cast<Midi_processor_setup_screen*>(view);
     auto newview = Midi_processor_manager::instance().add_new_midi_processor_by_idx(idx, me->cable_num, me->is_midi_in);
     me->menu.insert_menu_item_before_current(new View_launch_menu_item(*newview, me->processor_select.get_menu_item_text(idx), me->screen, me->font));
 }
 
-rppicomidi::View::Select_result rppicomidi::Midi_processing_setup_screen::on_select(View** new_view)
+rppicomidi::View::Select_result rppicomidi::Midi_processor_setup_screen::on_select(View** new_view)
 {
     int idx = menu.get_current_item_idx();
     if (idx <= static_cast<int>(menu.get_num_items())-1) {
@@ -69,7 +69,7 @@ rppicomidi::View::Select_result rppicomidi::Midi_processing_setup_screen::on_sel
     return Select_result::no_op;
 }
 
-void rppicomidi::Midi_processing_setup_screen::on_left(uint32_t delta)
+void rppicomidi::Midi_processor_setup_screen::on_left(uint32_t delta)
 {
     if (delta > 1) {
         // Don't want to delete too many things at one go

@@ -101,9 +101,9 @@ void rppicomidi::Home_screen::set_connected_device(const char* device_label_, ui
     num_in_cables = num_in_cables_;
     num_out_cables = num_out_cables_;
     for (uint8_t cable=0; cable < num_in_cables; cable++)
-        midi_in_setup.push_back(new Midi_processing_setup_screen{screen, label_font, cable, true});
+        midi_in_setup.push_back(new Midi_processor_setup_screen{screen, label_font, cable, true});
     for (uint8_t cable=0; cable < num_out_cables; cable++)
-        midi_out_setup.push_back(new Midi_processing_setup_screen{screen, label_font, cable, false});
+        midi_out_setup.push_back(new Midi_processor_setup_screen{screen, label_font, cable, false});
     printf("New connection %s %u IN %u OUT\r\n", device_label, num_in_cables, num_out_cables);
     if (num_in_cables !=0 || num_out_cables !=0) {
         for (int port=0; port<num_in_cables; port++) {

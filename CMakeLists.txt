@@ -27,7 +27,7 @@ target_sources(${target_name} PRIVATE
  settings_file.cpp
  home_screen.cpp
  midi_processor_manager.cpp
- midi_processing_setup_screen.cpp
+ midi_processor_setup_screen.cpp
  midi_processor_mc_fader_pickup_settings_view.cpp
  midi_processor_transpose_view.cpp
  midi_processor_chan_mes_remap.cpp

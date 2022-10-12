@@ -31,7 +31,7 @@
 #include "view_manager.h"
 #include "menu.h"
 #include "view_launch_menu_item.h"
-#include "midi_processing_setup_screen.h"
+#include "midi_processor_setup_screen.h"
 namespace rppicomidi {
 class Home_screen : public View
 {
@@ -69,7 +69,7 @@ private:
     char device_label[max_device_label+1];
     uint8_t num_in_cables;
     uint8_t num_out_cables;
-    std::vector<Midi_processing_setup_screen*> midi_in_setup;
-    std::vector<Midi_processing_setup_screen*> midi_out_setup;
+    std::vector<Midi_processor_setup_screen*> midi_in_setup;
+    std::vector<Midi_processor_setup_screen*> midi_out_setup;
 };
 }

@@ -6,10 +6,10 @@
 #include "text_item_chooser_menu.h"
 namespace rppicomidi
 {
-class Midi_processing_setup_screen : public View
+class Midi_processor_setup_screen : public View
 {
 public:
-    Midi_processing_setup_screen(Mono_graphics& screen_, const Mono_mono_font& font_,
+    Midi_processor_setup_screen(Mono_graphics& screen_, const Mono_mono_font& font_,
         uint8_t cable_num_, bool is_midi_in_);
     void draw() final;
     static void select_callback(View* me, int& idx);
