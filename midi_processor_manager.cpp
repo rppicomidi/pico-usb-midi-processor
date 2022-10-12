@@ -227,10 +227,16 @@ void rppicomidi::Midi_processor_manager::task()
     bool needs_store = false;
     
     int64_t diff = absolute_time_diff_us(previous_timestamp, now);
-    if (diff > 10000000ll) {
+    if (diff > 60000000ll) { // check needs saving once per minute
         previous_timestamp = now;
         for (auto in_cable = midi_in_processors.begin(); !needs_store && in_cable != midi_in_processors.end(); in_cable++) {
             for (auto proc = in_cable->begin(); !needs_store && proc != in_cable->end(); proc++) {
+                printf("processor %s needs store=%s\r\n",proc->proc->get_name(), proc->proc->not_saved() ? "True":"False");
+                needs_store = proc->proc->not_saved();
+            }
+        }
+        for (auto out_cable = midi_out_processors.begin(); !needs_store && out_cable != midi_out_processors.end(); out_cable++) {
+            for (auto proc = out_cable->begin(); !needs_store && proc != out_cable->end(); proc++) {
                 printf("processor %s needs store=%s\r\n",proc->proc->get_name(), proc->proc->not_saved() ? "True":"False");
                 needs_store = proc->proc->not_saved();
             }
