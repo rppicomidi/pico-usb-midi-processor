@@ -40,6 +40,8 @@
 #include "midi_processor_settings_view.h"
 #include "pico/mutex.h"
 #include "view.h"
+#include "settings_file.h"
+
 namespace rppicomidi
 {
 class Midi_processor_manager
@@ -266,5 +268,6 @@ private:
     std::vector<std::vector<Midi_processor_fn>> midi_out_proc_fns;
     std::vector<Midi_processor*> processors_with_tasks;
     Mono_graphics* screen;
+    Settings_file settings_file;
 };
 }

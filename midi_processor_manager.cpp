@@ -5,6 +5,7 @@
 #include "midi_processor_mc_fader_pickup_settings_view.h"
 #include "midi_processor_transpose_view.h"
 #include "midi_processor_chan_mes_remap_settings_view.h"
+
 uint16_t rppicomidi::Midi_processor_manager::unique_id = 0;
 rppicomidi::Midi_processor_manager::Midi_processor_manager() : screen{nullptr}
 {
@@ -20,9 +21,7 @@ rppicomidi::Midi_processor_manager::Midi_processor_manager() : screen{nullptr}
 
 void rppicomidi::Midi_processor_manager::set_connected_device(uint16_t vid_, uint16_t pid_, uint8_t num_in_cables_, uint8_t num_out_cables_)
 {
-    // TODO: use vid_ and pid_ to generate settings file name and recall settings on device connect if settings exist
-    (void)vid_;
-    (void)pid_;
+    // create data structures for managing processors for MIDI IN and MIDI OUT
     for (int cable = 0; cable < num_in_cables_; cable++) {
         midi_in_processors.push_back(std::vector<Mpv_element>());
         midi_in_proc_fns.push_back(std::vector<Midi_processor_fn>());
@@ -30,6 +29,11 @@ void rppicomidi::Midi_processor_manager::set_connected_device(uint16_t vid_, uin
     for (int cable = 0; cable < num_out_cables_; cable++) {
         midi_out_processors.push_back(std::vector<Mpv_element>());
         midi_out_proc_fns.push_back(std::vector<Midi_processor_fn>());
+    }
+    // Get stored settings for this device if any
+    settings_file.set_vid_pid(vid_, pid_);
+    if (!settings_file.load()) {
+        printf("error loading settings for device %04x-%04x\r\n", vid_, pid_);
     }
 }
 
@@ -147,6 +151,7 @@ void rppicomidi::Midi_processor_manager::build_processor_structures()
             if (midi_in_proc.proc->has_task()) {
                 processors_with_tasks.push_back(midi_in_proc.proc);
             }
+            midi_in_proc.proc->set_not_saved();
         }
     }
 
@@ -164,6 +169,7 @@ void rppicomidi::Midi_processor_manager::build_processor_structures()
             if (midi_out_proc.proc->has_task()) {
                 processors_with_tasks.push_back(midi_out_proc.proc);
             }
+            midi_out_proc.proc->set_not_saved();
         }
     }
 }
@@ -209,12 +215,33 @@ bool rppicomidi::Midi_processor_manager::filter_midi_out(uint8_t cable, uint8_t*
 
 void rppicomidi::Midi_processor_manager::task()
 {
+    static absolute_time_t previous_timestamp = {0};
     mutex_enter_blocking(&processing_mutex);
     for (auto& proc: processors_with_tasks) {
         proc->task();
     }
+
+    // check if any processor settings are dirty once every 10 seconds
+    // and if any are store the settings to flash
+    absolute_time_t now = get_absolute_time();
+    bool needs_store = false;
+    
+    int64_t diff = absolute_time_diff_us(previous_timestamp, now);
+    if (diff > 10000000ll) {
+        previous_timestamp = now;
+        for (auto in_cable = midi_in_processors.begin(); !needs_store && in_cable != midi_in_processors.end(); in_cable++) {
+            for (auto proc = in_cable->begin(); !needs_store && proc != in_cable->end(); proc++) {
+                printf("processor %s needs store=%s\r\n",proc->proc->get_name(), proc->proc->not_saved() ? "True":"False");
+                needs_store = proc->proc->not_saved();
+            }
+        }
+    }
     mutex_exit(&processing_mutex);
-}
+    if (needs_store) {
+        printf("storing all settings to flash\r\n");
+        settings_file.store();
+    }
+ }
 
 char* rppicomidi::Midi_processor_manager::serialize()
 {

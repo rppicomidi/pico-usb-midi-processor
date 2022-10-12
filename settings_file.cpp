@@ -1,8 +1,8 @@
 #include <assert.h>
 #include "settings_file.h"
 #include "littlefs-lib/pico_hal.h"
-
-rppicomidi::Settings_file::Settings_file(Midi_processor_model& model_) : model{model_}, vid{0}, pid{0}
+#include "midi_processor_manager.h"
+rppicomidi::Settings_file::Settings_file() : vid{0}, pid{0}
 {
     // Make sure the flash filesystem is working
     int error_code = pico_mount(false);
@@ -43,13 +43,13 @@ int rppicomidi::Settings_file::load_settings_string(char** raw_settings_ptr)
             printf("unexpected error %d mounting flash\r\n", error_code);
             return false;
         }
-        char settings_filename[15];
+        char settings_filename[]="0000-0000.json";
         get_filename(settings_filename);
         int file = pico_open(settings_filename, LFS_O_RDONLY);
         if (file < 0) {
             // file isn't there
             pico_unmount();
-            return file;
+            return file; // the error code
         }
         else {
             // file is open. Read the whole contents to a string
@@ -69,8 +69,9 @@ int rppicomidi::Settings_file::load_settings_string(char** raw_settings_ptr)
             auto nread = pico_read(file, *raw_settings_ptr, flen);
             pico_close(file);
             pico_unmount();
-            if (nread == flen) {
+            if (nread == (lfs_size_t)flen) {
                 // Success!
+                (*raw_settings_ptr)[flen]='\0'; // just in case, add null termination
                 return LFS_ERR_OK;
             }
             if (nread > 0) {
@@ -86,82 +87,95 @@ int rppicomidi::Settings_file::load_settings_string(char** raw_settings_ptr)
 
 bool rppicomidi::Settings_file::load()
 {
-    //using json = nlohmann::json;
     char* raw_settings = NULL;
     auto error_code = load_settings_string(&raw_settings);
     if (error_code == LFS_ERR_OK) {
         printf("load (%04x-%04x): %s\r\n", vid, pid, raw_settings);
-        bool result = model.deserialize(raw_settings);
-        free((void *)raw_settings);
+        bool result = Midi_processor_manager::instance().deserialize(raw_settings);
+        delete[] raw_settings;
         return result;
     }
+    printf("settings file load error %s\r\n", pico_errmsg(error_code));
     if (raw_settings)
-        free((void *)raw_settings);
+        delete[] raw_settings;
     return false;
 }
 
 int rppicomidi::Settings_file::store()
 {
-    char* raw_settings;
-
     // Serialize to a string for storage
-    char* settings_str = model.serialize();
+    char* settings_str = Midi_processor_manager::instance().serialize();
     if (settings_str) {
         printf("store (%04x-%04x): %s\r\n",vid,pid, settings_str);
     }
     else {
-        return false;
+        return LFS_ERR_NOMEM;
     }
     // Move current settings file to a backup file if current settings file exists
     int error_code = pico_mount(false);
     if (error_code != 0) {
         free((void*)settings_str);
-        printf("unexpected error %d mounting flash\r\n", error_code);
-        return false;
+        printf("unexpected error %s mounting flash\r\n", pico_errmsg(error_code));
+        return error_code;
     }
 
     char settings_filename[]="0000-0000.json";
     get_filename(settings_filename);
+    printf("opening file %s for read only\r\n", settings_filename);
     int file = pico_open(settings_filename, LFS_O_RDONLY);
     if (file < 0) {
         // file does not exist
+        printf("opening/creating file %s for read/write\r\n", settings_filename);
         file = pico_open(settings_filename, LFS_O_RDWR | LFS_O_CREAT);
         if (file < 0) {
             printf("could not open settings.json for writing\r\n");
             free((void*)settings_str);
             pico_unmount();
-            return false;
+            return file;
         }
     }
     else {
         // file exists. Copy it to a backup
         pico_close(file);
         char backup_filename[]="0000-0000.bu";
-        get_filename(settings_filename);
-        if (pico_rename(settings_filename, backup_filename) == LFS_ERR_EXIST) {
+        get_filename(backup_filename);
+        printf("renaming file %s to file %s\r\n", settings_filename, backup_filename);
+        error_code = pico_rename(settings_filename, backup_filename);
+        if (error_code == LFS_ERR_EXIST) {
+            printf("backup file %s exists. Deleting it first\r\n", backup_filename);
             if (pico_remove(backup_filename) == LFS_ERR_OK) {
-                if (pico_rename(settings_filename, backup_filename) != LFS_ERR_OK) {
+                error_code = pico_rename(settings_filename, backup_filename);
+                if (error_code != LFS_ERR_OK) {
+                    printf("error %s renaming file %s to file %s\r\n", pico_errmsg(error_code), settings_filename, backup_filename);
                     free((void*)settings_str);
                     // something went wrong
                     pico_unmount();
-                    return false;
+                    return error_code;
                 }
             }
             else {
                 printf("error moving %s to s%s\r\n",settings_filename, backup_filename);
                 free((void*)settings_str);
                 pico_unmount();
-                return false;
+                return error_code;
             }
-        } 
+        }
+        else if (error_code != LFS_ERR_OK) {
+            printf("error moving %s to s%s\r\n",settings_filename, backup_filename);
+            free((void*)settings_str);
+            pico_unmount();
+            return false;
+        }
+        printf("opening/creating file %s for read/write\r\n", settings_filename);
         file = pico_open(settings_filename, LFS_O_RDWR | LFS_O_CREAT);
         if (file < 0) {
             printf("could not open %s for writing\r\n",settings_filename);
             free((void*)settings_str);
             pico_unmount();
-            return false;
+            return file;
         }
     }
+    printf("writing\r\n%s\r\nto file %s\r\n", settings_str, settings_filename);
     // file is open for writing; write the settings
     error_code = pico_write(file, settings_str, strlen(settings_str)+1);
 
@@ -169,6 +183,7 @@ int rppicomidi::Settings_file::store()
     pico_close(file);
     pico_unmount();
     if (error_code < 0) {
+        printf("error %s writing settings to file\r\n", pico_errmsg(error_code));
         return error_code;
     }
     else if ((size_t)error_code < strlen(settings_str)) {

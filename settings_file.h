@@ -33,26 +33,33 @@
 #pragma once
 #include <cstdint>
 #include <string>
-#include "midi_processor_model.h"
 
 namespace rppicomidi {
 /**
- * @brief convert an integer type to a std::string in hex notation
+ * @brief convert an integer type to a null-terminated C-string in hex notation
+ *
+ * @param w the value to convert to hex
+ * @param hex_cstr a pointer to the buffer to receive the converted string
+ * @param max_cstr the maximum characters to convert. If max_cstr is not
+ * long enough to contain all the required hex digits, this function asserts.
+ * If max_cstr is not large enough to contain all the hex digits plus a null
+ * termination, then the null-termination is omitted.
  *
  * @note this template modified from https://stackoverflow.com/questions/5100718/integer-to-hex-string-in-c
  */
 template <typename I> void n2hexstr(I w, char* hex_cstr, size_t max_cstr) {
     size_t hex_len = sizeof(I)<<1;
-    assert(max_cstr > hex_len);
+    assert(max_cstr >= hex_len);
     static const char* digits = "0123456789ABCDEF";
     for (size_t i=0, j=(hex_len-1)*4 ; i<hex_len; ++i,j-=4)
         hex_cstr[i] = digits[(w>>j) & 0x0f];
-    hex_cstr[hex_len] = '\0';
+    if (hex_len < max_cstr)
+        hex_cstr[hex_len] = '\0';
 }
 
 class Settings_file {
 public:
-    Settings_file(Midi_processor_model& model_);
+    Settings_file();
     /**
      * @brief Set the vid and pid values (used to form the JSON key
      * for serializing this object). This will trigger loading
@@ -100,12 +107,11 @@ private:
      * corruption will result.
      */
     void get_filename(char* fn) {
-        n2hexstr<uint16_t>(vid, fn, 5);
-        n2hexstr<uint16_t>(pid, fn+5, 5);
+        n2hexstr<uint16_t>(vid, fn, 4);
+        n2hexstr<uint16_t>(pid, fn+5, 4);
         fn[4] = '-';
     }
 
-    Midi_processor_model& model;
     uint16_t vid;       // the idVendor of the connected device (not serialized here)
     uint16_t pid;       // the idProduct of the connected device (not serialized here)
 };

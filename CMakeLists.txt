@@ -20,13 +20,10 @@ pico_generate_pio_header(${target_name} ${PICO_PIO_USB_SRC}/usb_tx.pio)
 pico_generate_pio_header(${target_name} ${PICO_PIO_USB_SRC}/usb_rx.pio)
 
 target_sources(${target_name} PRIVATE
-# midi_app.c
  pico-usb-midi-processor.cpp
  usb_descriptors.c
- #keylab_essential_mc_filter.c
  midi_processor_mc_fader_pickup.cpp
  midi_processor_transpose.cpp
- midi_processor_model.cpp
  settings_file.cpp
  home_screen.cpp
  midi_processor_manager.cpp

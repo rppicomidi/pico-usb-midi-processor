@@ -21,7 +21,6 @@
 #include "class/midi/midi_host.h"
 #include "class/midi/midi_device.h"
 #include "usb_descriptors.h"
-#include "settings_file.h"
 #include "home_screen.h"
 #include "nav_buttons.h"
 #include "midi_processor.h"
@@ -66,8 +65,6 @@ public:
     Ssd1306 ssd1306;    // the SSD1306 driver object
     Mono_graphics oled_screen; // the screen object
     View_manager oled_view_manager; // the view manager object
-    Midi_processor_model model;
-    Settings_file settings_file;
     uint8_t midi_dev_addr;  // The device address of the connected device
     enum {MIDI_DEVICE_NOT_INITIALIZED, MIDI_DEVICE_NEEDS_INIT, MIDI_DEVICE_IS_INITIALIZED} midi_device_status;
 
@@ -86,8 +83,6 @@ uint16_t rppicomidi::Pico_usb_midi_processor::render_done_mask = 0;
 rppicomidi::Pico_usb_midi_processor::Pico_usb_midi_processor()  : addr{OLED_ADDR},
     ssd1306{&i2c_driver_oled, 0, Ssd1306::Com_pin_cfg::ALT_DIS, 128, 64, 0, 0}, // set up the SSD1306 to drive at 128 x 64 oled
     oled_screen{&ssd1306, Display_rotation::Landscape180},                        // set up the screen for rotated landscape orientation
-    settings_file{model},
-    //setup_menu{oled_screen, oled_screen.get_clip_rect(), model, settings_file},
     midi_dev_addr{0},
     midi_device_status{MIDI_DEVICE_NOT_INITIALIZED},
     home_screen{oled_view_manager, oled_screen, "PICO MIDI PROCESSOR No Connected Device"},
@@ -163,6 +158,16 @@ void rppicomidi::Pico_usb_midi_processor::poll_midi_host_rx(void)
 void rppicomidi::Pico_usb_midi_processor::task()
 {
     if (midi_device_status == MIDI_DEVICE_NEEDS_INIT) {
+        uint8_t len = get_product_string_length();
+        if (len > 0) {
+            char prod[len+1];
+            get_product_string(prod, len+1);
+            uint8_t num_in_cables = tuh_midi_get_num_tx_cables(midi_dev_addr);
+            uint8_t num_out_cables = tuh_midi_get_num_rx_cables(midi_dev_addr);
+            home_screen.set_connected_device(prod, num_in_cables, num_out_cables);
+            Midi_processor_manager::instance().set_connected_device(get_vid(), get_pid(), num_in_cables, num_out_cables);
+            home_screen.draw();
+        }
         tud_init(0);
         TU_LOG1("MIDI device initialized\r\n");
         midi_device_status = MIDI_DEVICE_IS_INITIALIZED;
@@ -222,7 +227,7 @@ static void midi_host_app_task(void)
 void core1_main()
 {
     sleep_ms(10);
-
+    multicore_lockout_victim_init(); // need to lockout core1 when core0 writes to flash
     // Use tuh_configure() to pass pio configuration to the host stack
     // Note: tuh_configure() must be called before
     pio_usb_configuration_t pio_cfg = PIO_USB_DEFAULT_CONFIG;
@@ -246,17 +251,8 @@ void device_clone_complete_cb()
 
 void rppicomidi::Pico_usb_midi_processor::clone_complete_cb()
 {
+    printf("clone callback complete processor %u\r\n", get_core_num());
     midi_device_status = MIDI_DEVICE_NEEDS_INIT;
-    uint8_t len = get_product_string_length();
-    if (len > 0) {
-        char prod[len+1];
-        get_product_string(prod, len+1);
-        uint8_t num_in_cables = tuh_midi_get_num_tx_cables(midi_dev_addr);
-        uint8_t num_out_cables = tuh_midi_get_num_rx_cables(midi_dev_addr);
-        home_screen.set_connected_device(prod, num_in_cables, num_out_cables);
-        Midi_processor_manager::instance().set_connected_device(get_vid(), get_pid(), num_in_cables, num_out_cables);
-        home_screen.draw();
-    }
 }
 
 // core0: handle device events
@@ -270,13 +266,19 @@ int main()
     // direct printf to UART
     stdio_init_all();
 
-    multicore_reset_core1();
+    // all USB Host task run in core1
+    multicore_reset_core1();    
+    multicore_launch_core1(core1_main);
 
+    // synchronize core1 startup
+    while(!multicore_lockout_start_timeout_us(10000)) {
+        // wait for lockout to work
+    }
+    while (!multicore_lockout_end_timeout_us(1000)) {
+        // wait for unlock to work
+    }
     // initialize the Pico_usb_midi_processor object instance
     auto instance_ptr=&rppicomidi::Pico_usb_midi_processor::instance();
-
-    // all USB Host task run in core1
-    multicore_launch_core1(core1_main);
 
     TU_LOG1("pico-usb-midi-processor\r\n");
     while (1) {
