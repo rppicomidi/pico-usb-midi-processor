@@ -9,7 +9,7 @@ add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/ext_lib/littlefs-lib ext_lib/littlefs
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/lib/pico-ssd1306-mono-graphics-lib lib/pico-ssd1306-mono-graphics-lib)
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/lib/pico-mono-ui-lib lib/pico-mono-ui-lib)
 
-set(target_name midi_app)
+set(target_name midi_processor)
 add_executable(${target_name})
 
 pico_enable_stdio_uart(${target_name} 1) 
