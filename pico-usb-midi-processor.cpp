@@ -291,13 +291,6 @@ int main()
     multicore_reset_core1();    
     multicore_launch_core1(core1_main);
 
-    // synchronize core1 startup
-    while(!multicore_lockout_start_timeout_us(10000)) {
-        // wait for lockout to work
-    }
-    while (!multicore_lockout_end_timeout_us(1000)) {
-        // wait for unlock to work
-    }
     // initialize the Pico_usb_midi_processor object instance
     auto instance_ptr=&rppicomidi::Pico_usb_midi_processor::instance();
 
