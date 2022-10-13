@@ -119,21 +119,21 @@ rppicomidi::Pico_usb_midi_processor::Pico_usb_midi_processor()  : addr{OLED_ADDR
     gpio_init(BUTTON_RIGHT);
     gpio_init(BUTTON_ENTER);
     gpio_init(BUTTON_BACK);
-    gpio_init(BUTTON_HOME);
+    gpio_init(BUTTON_SHIFT);
     gpio_set_dir(BUTTON_UP, GPIO_IN);
     gpio_set_dir(BUTTON_DOWN, GPIO_IN);
     gpio_set_dir(BUTTON_LEFT, GPIO_IN);
     gpio_set_dir(BUTTON_RIGHT, GPIO_IN);
     gpio_set_dir(BUTTON_ENTER, GPIO_IN);
     gpio_set_dir(BUTTON_BACK, GPIO_IN);
-    gpio_set_dir(BUTTON_HOME, GPIO_IN);
+    gpio_set_dir(BUTTON_SHIFT, GPIO_IN);
     gpio_pull_up(BUTTON_UP);
     gpio_pull_up(BUTTON_DOWN);
     gpio_pull_up(BUTTON_LEFT);
     gpio_pull_up(BUTTON_RIGHT);
     gpio_pull_up(BUTTON_ENTER);
     gpio_pull_up(BUTTON_BACK);
-    gpio_pull_up(BUTTON_HOME);
+    gpio_pull_up(BUTTON_SHIFT);
 
     render_done_mask = 0;
     int num_displays = 1;

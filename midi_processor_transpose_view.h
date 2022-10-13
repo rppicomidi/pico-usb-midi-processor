@@ -41,8 +41,8 @@ public:
     void entry() final {menu.entry();}
     void exit() final {menu.exit();}
     Select_result on_select(View** new_view) final { return menu.on_select(new_view);}
-    void on_increment(uint32_t delta) final { menu.on_increment(delta); }
-    void on_decrement(uint32_t delta) final { menu.on_decrement(delta); }
+    void on_increment(uint32_t delta, bool is_shifted) final { menu.on_increment(delta, is_shifted); }
+    void on_decrement(uint32_t delta, bool is_shifted) final { menu.on_decrement(delta, is_shifted); }
 
     static Midi_processor_settings_view* static_make_new(Mono_graphics& screen_, const Rectangle& rect_, Midi_processor* proc_)
     {

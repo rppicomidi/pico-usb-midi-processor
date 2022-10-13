@@ -43,8 +43,8 @@ public:
 
     void draw() final;
     Select_result on_select(View** new_view) final;
-    void on_increment(uint32_t delta) final {menu.on_increment(delta); };
-    void on_decrement(uint32_t delta) final {menu.on_decrement(delta); };
+    void on_increment(uint32_t delta, bool is_shifted) final {menu.on_increment(delta, is_shifted); };
+    void on_decrement(uint32_t delta, bool is_shifted) final {menu.on_decrement(delta, is_shifted); };
 
     /**
      * @brief set the device_label string to the new value

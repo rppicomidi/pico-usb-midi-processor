@@ -38,9 +38,9 @@ public:
     void entry() final;
     void exit() final;
     Select_result on_select(View** new_view) final;
-    void on_left(uint32_t delta) final; // delete the selected element
-    void on_increment(uint32_t delta) final {menu.on_increment(delta); };
-    void on_decrement(uint32_t delta) final {menu.on_decrement(delta); };
+    void on_left(uint32_t delta, bool) final; // delete the selected element
+    void on_increment(uint32_t delta, bool is_shifted) final {menu.on_increment(delta, is_shifted); };
+    void on_decrement(uint32_t delta, bool is_shifted) final {menu.on_decrement(delta, is_shifted); };
 private:
     Mono_mono_font font;
     uint8_t cable_num;

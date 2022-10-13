@@ -124,7 +124,7 @@ void rppicomidi::Midi_processor_chan_mes_remap_settings_view::static_new_remap_c
     me->draw();
 }
 
-void rppicomidi::Midi_processor_chan_mes_remap_settings_view::on_left(uint32_t delta)
+void rppicomidi::Midi_processor_chan_mes_remap_settings_view::on_left(uint32_t delta, bool is_shifted)
 {
     if (menu.get_has_focus()) {
         // Do not erase multiple items at once by accident
@@ -153,6 +153,6 @@ void rppicomidi::Midi_processor_chan_mes_remap_settings_view::on_left(uint32_t d
     }
     else {
         // pass it on to the current item via the menu object
-        menu.on_left(delta);
+        menu.on_left(delta, is_shifted);
     }
 }

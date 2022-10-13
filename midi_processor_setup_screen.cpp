@@ -91,7 +91,7 @@ rppicomidi::View::Select_result rppicomidi::Midi_processor_setup_screen::on_sele
     return Select_result::no_op;
 }
 
-void rppicomidi::Midi_processor_setup_screen::on_left(uint32_t delta)
+void rppicomidi::Midi_processor_setup_screen::on_left(uint32_t delta, bool)
 {
     if (delta > 1) {
         // Don't want to delete too many things at one go
