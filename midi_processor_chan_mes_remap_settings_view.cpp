@@ -50,6 +50,13 @@ rppicomidi::Midi_processor_chan_mes_remap_settings_view::
         assert(item);
         mes_type_menu.add_menu_item(item);
     }
+}
+
+void rppicomidi::Midi_processor_chan_mes_remap_settings_view::entry()
+{
+    auto remap_proc = reinterpret_cast<Midi_processor_chan_mes_remap*>(proc);
+    auto mes_type_list = remap_proc->get_all_possible_channel_message_types();
+    menu.clear();
     const char* text = (*mes_type_list)[mes_type_menu.get_current_item_idx()].c_str();
     mes_type_menu_item = new View_launch_menu_item(mes_type_menu, text, screen, font);
     assert(mes_type_menu_item);
@@ -64,9 +71,17 @@ rppicomidi::Midi_processor_chan_mes_remap_settings_view::
     display_format_item = new Callback_menu_item{display_format_str.c_str(), screen, font, this, static_toggle_display_format};
     assert(display_format_item);
     menu.add_menu_item(display_format_item);
+    size_t fmt_idx = remap_proc->get_display_format();
+    for (size_t idx = 0; idx < remap_proc->get_num_remap(); idx++) {
+        auto item = new Bimap_spinner_menu_item<uint8_t>("Remap:", screen, font, idx, 3, 2, fmt_idx == 1,
+            Midi_processor_chan_mes_remap::static_get, Midi_processor_chan_mes_remap::static_incr,
+            reinterpret_cast<void*>(remap_proc));
+        menu.add_menu_item(item);
+    }
     auto item = new Callback_menu_item{"Add new remap", screen, font, this, static_new_remap_callback};
     assert(item);
     menu.add_menu_item(item);
+    menu.entry();
 }
 
 void rppicomidi::Midi_processor_chan_mes_remap_settings_view::draw()

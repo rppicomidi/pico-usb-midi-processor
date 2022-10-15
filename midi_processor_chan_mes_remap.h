@@ -69,6 +69,7 @@ public:
     const std::vector<std::string>* get_all_possible_display_formats() const { return display_format.get_all_possible_values(); }
     void serialize_settings(const char* name, JSON_Object *root_object) final;
     bool deserialize_settings(JSON_Object *root_object) final;
+    size_t get_num_remap() { return bimap.size(); }
     static uint8_t static_get(void *context_, size_t bimap_idx_, size_t element_idx_)
     {
         auto me = reinterpret_cast<Midi_processor_chan_mes_remap *>(context_);

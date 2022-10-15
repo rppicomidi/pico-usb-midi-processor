@@ -47,7 +47,7 @@ public:
     Midi_processor_chan_mes_remap_settings_view(Mono_graphics& screen_, const Rectangle& rect_, Midi_processor* proc_);
     void draw() final;
     static void add_new_callback(View* context, int& idx);
-    void entry() final {menu.entry(); }
+    void entry() final;
     void exit() final {menu.exit(); }
     Select_result on_select(View** new_view) final { return menu.on_select(new_view); }
     void on_increment(uint32_t delta, bool is_shifted) final {menu.on_increment(delta, is_shifted); };
