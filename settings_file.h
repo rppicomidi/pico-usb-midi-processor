@@ -78,6 +78,8 @@ public:
      */
     bool load();
 
+    bool load_preset(uint8_t);
+
     /**
      * @brief If the current settings are different from the settings in flash,
      * write the settings to the flash

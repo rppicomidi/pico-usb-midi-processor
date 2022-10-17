@@ -32,12 +32,13 @@
 #include "menu.h"
 #include "view_launch_menu_item.h"
 #include "midi_processor_setup_screen.h"
+#include "preset_view.h"
 namespace rppicomidi {
 class Home_screen : public View
 {
 public:
 
-    Home_screen(View_manager& view_manager_, Mono_graphics& screen_, const char* device_label_);
+    Home_screen(Mono_graphics& screen_, const char* device_label_);
 
     virtual ~Home_screen()=default;
 
@@ -61,7 +62,6 @@ private:
     Home_screen() = delete;
     Home_screen(Home_screen&) = delete;
 
-    View_manager& view_manager;
     const Mono_mono_font& label_font;
     Menu menu;
     static const uint8_t max_line_length = 21;
@@ -71,5 +71,6 @@ private:
     uint8_t num_out_cables;
     std::vector<Midi_processor_setup_screen*> midi_in_setup;
     std::vector<Midi_processor_setup_screen*> midi_out_setup;
+    Preset_view* preset_view;
 };
 }

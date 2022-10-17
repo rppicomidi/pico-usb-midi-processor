@@ -30,7 +30,7 @@
 #include "midi_processor_chan_mes_remap_settings_view.h"
 
 uint16_t rppicomidi::Midi_processor_manager::unique_id = 0;
-rppicomidi::Midi_processor_manager::Midi_processor_manager() : screen{nullptr}
+rppicomidi::Midi_processor_manager::Midi_processor_manager() : screen{nullptr}, current_preset{"current preset",1,8,1}
 {
     // Note: try to add new processor types to this list alphabetically
     mutex_init(&processing_mutex);
@@ -124,32 +124,27 @@ void rppicomidi::Midi_processor_manager::delete_midi_processor_by_idx(int idx, u
     mutex_exit(&processing_mutex);
 }
 
-#if 0
-void rppicomidi::Midi_processor_manager::delete_midi_processor_by_unique_id(uint16_t uid, uint8_t cable, bool is_midi_in)
+void rppicomidi::Midi_processor_manager::clear_all_processors()
 {
-    if (is_midi_in) {
-        mutex_enter_blocking(&processing_mutex);
-        if (cable < midi_in_processors.size()) {
-            auto it = midi_in_processors[cable].begin();
-            for (; it != midi_in_processors[cable].end(); it++) {
-                if ((*it)->get_unique_id() == uid) {
-                    delete (*it);
-                    (*it) = nullptr;
-                    break;
-                }
-            }
-            if (it != midi_in_processors[cable].end()) {
-                midi_in_processors[cable].erase(it);
-                build_processor_structures();
-            }
-            else {
-                printf("Processor id %u on MIDI %s cable %u not deleted\r\n", uid, is_midi_in ? "IN":"OUT", cable);
-            }
+    // erase all data structures associated with the processor lists
+    for (size_t cable=0; cable < midi_in_processors.size(); cable++) {
+        midi_in_proc_fns[cable].clear();
+        for (auto& proc: midi_in_processors[cable]) {
+            delete proc.proc;
+            delete proc.view;
         }
-        mutex_exit(&processing_mutex);
+        midi_in_processors[cable].clear();
     }
+    for (size_t cable=0; cable < midi_out_processors.size(); cable++) {
+        midi_out_proc_fns[cable].clear();
+        for (auto& proc: midi_out_processors[cable]) {
+            delete proc.proc;
+            delete proc.view;
+        }
+        midi_out_processors[cable].clear();
+    }
+    processors_with_tasks.clear();
 }
-#endif
 
 void rppicomidi::Midi_processor_manager::build_processor_structures()
 {
@@ -240,64 +235,87 @@ bool rppicomidi::Midi_processor_manager::filter_midi_out(uint8_t cable, uint8_t*
 
 void rppicomidi::Midi_processor_manager::task()
 {
-    static absolute_time_t previous_timestamp = {0};
     mutex_enter_blocking(&processing_mutex);
     for (auto& proc: processors_with_tasks) {
         proc->task();
     }
-
-    // check if any processor settings are dirty once every 10 seconds
-    // and if any are store the settings to flash
-    absolute_time_t now = get_absolute_time();
-    bool needs_store = false;
-    
-    int64_t diff = absolute_time_diff_us(previous_timestamp, now);
-    if (diff > 60000000ll) { // check needs saving once per minute
-        previous_timestamp = now;
-        for (auto in_cable = midi_in_processors.begin(); !needs_store && in_cable != midi_in_processors.end(); in_cable++) {
-            for (auto proc = in_cable->begin(); !needs_store && proc != in_cable->end(); proc++) {
-                printf("processor %s needs store=%s\r\n",proc->proc->get_name(), proc->proc->not_saved() ? "True":"False");
-                needs_store = proc->proc->not_saved();
-            }
-        }
-        for (auto out_cable = midi_out_processors.begin(); !needs_store && out_cable != midi_out_processors.end(); out_cable++) {
-            for (auto proc = out_cable->begin(); !needs_store && proc != out_cable->end(); proc++) {
-                printf("processor %s needs store=%s\r\n",proc->proc->get_name(), proc->proc->not_saved() ? "True":"False");
-                needs_store = proc->proc->not_saved();
-            }
-        }
-    }
     mutex_exit(&processing_mutex);
-    if (needs_store) {
-        printf("storing all settings to flash\r\n");
-        settings_file.store();
-    }
  }
 
-char* rppicomidi::Midi_processor_manager::serialize()
+
+bool rppicomidi::Midi_processor_manager::needs_store()
 {
-    mutex_enter_blocking(&processing_mutex); // Don't allow processing or changes while serializing
-    JSON_Value *root_value = json_value_init_object();
-    JSON_Object *root_object = json_value_get_object(root_value);
-    int idx = 1;
-    for (auto& midi_in_cable_processors: midi_in_processors) {
-        JSON_Value *midi_value = json_value_init_object();
-        JSON_Object *midi_object = json_value_get_object(midi_value);
-        for (auto& proc: midi_in_cable_processors) {
-            proc.proc->serialize_settings(proc.proc->get_name(), midi_object);
+    bool dirty = false;
+    for (auto in_cable = midi_in_processors.begin(); !dirty && in_cable != midi_in_processors.end(); in_cable++) {
+        for (auto proc = in_cable->begin(); !dirty && proc != in_cable->end(); proc++) {
+            printf("processor %s needs store=%s\r\n",proc->proc->get_name(), proc->proc->not_saved() ? "True":"False");
+            dirty = proc->proc->not_saved();
         }
-        std::string midi_name = std::string{"MIDI IN"}+std::to_string(idx++);
-        json_object_set_value(root_object, midi_name.c_str(), midi_value);
     }
-    idx = 1;
-    for (auto& midi_out_cable_processors: midi_out_processors) {
-        JSON_Value *midi_value = json_value_init_object();
-        JSON_Object *midi_object = json_value_get_object(midi_value);
-        for (auto& proc: midi_out_cable_processors) {
-            proc.proc->serialize_settings(proc.proc->get_name(), midi_object);
+    for (auto out_cable = midi_out_processors.begin(); !dirty && out_cable != midi_out_processors.end(); out_cable++) {
+        for (auto proc = out_cable->begin(); !dirty && proc != out_cable->end(); proc++) {
+            printf("processor %s needs store=%s\r\n",proc->proc->get_name(), proc->proc->not_saved() ? "True":"False");
+            dirty = proc->proc->not_saved();
         }
-        std::string midi_name = std::string{"MIDI OUT"}+std::to_string(idx++);
-        json_object_set_value(root_object, midi_name.c_str(), midi_value);
+    }
+    return dirty;
+}
+
+char* rppicomidi::Midi_processor_manager::serialize(uint8_t preset_num, char* previous_serialized_string)
+{
+    if (preset_num < current_preset.get_min() || preset_num > current_preset.get_max())
+        return nullptr;
+    bool free_previous = false;
+    if (previous_serialized_string == nullptr) {
+        previous_serialized_string = serialize_default();
+        free_previous = true;
+    }
+    JSON_Value* root_value= json_parse_string(previous_serialized_string);
+    if (free_previous) {
+        json_free_serialized_string(previous_serialized_string);
+    }
+    if (root_value && json_value_get_type(root_value) == JSONObject) {
+        mutex_enter_blocking(&processing_mutex); // Don't allow processing or changes while serializing
+        JSON_Object* root_object = json_value_get_object(root_value);
+        current_preset.set(preset_num);
+        JSON_Value* preset_value = json_object_get_value(root_object, std::to_string(current_preset.get()).c_str());
+        if (preset_value == nullptr) {
+            // something is wrong with the previous_serialized_string
+            char* default_json = serialize_default();
+            if (default_json) {
+                json_value_free(root_value);
+                root_value= json_parse_string(default_json);
+                json_free_serialized_string(default_json);
+                if (root_value) {
+                    root_object = json_value_get_object(root_value);
+                    preset_value = json_object_get_value(root_object, std::to_string(current_preset.get()).c_str());
+                }
+            }
+        }
+        if (preset_value && json_value_get_type(preset_value) == JSONObject) {
+            current_preset.serialize(root_object);
+            JSON_Object* preset_object = json_value_get_object(preset_value);
+            int idx = 1;
+            for (auto& midi_in_cable_processors: midi_in_processors) {
+                JSON_Value *midi_value = json_value_init_object();
+                JSON_Object *midi_object = json_value_get_object(midi_value);
+                for (auto& proc: midi_in_cable_processors) {
+                    proc.proc->serialize_settings(proc.proc->get_name(), midi_object);
+                }
+                std::string midi_name = std::string{"MIDI IN"}+std::to_string(idx++);
+                json_object_set_value(preset_object, midi_name.c_str(), midi_value);
+            }
+            idx = 1;
+            for (auto& midi_out_cable_processors: midi_out_processors) {
+                JSON_Value *midi_value = json_value_init_object();
+                JSON_Object *midi_object = json_value_get_object(midi_value);
+                for (auto& proc: midi_out_cable_processors) {
+                    proc.proc->serialize_settings(proc.proc->get_name(), midi_object);
+                }
+                std::string midi_name = std::string{"MIDI OUT"}+std::to_string(idx++);
+                json_object_set_value(preset_object, midi_name.c_str(), midi_value);
+            }
+        }
     }
     mutex_exit(&processing_mutex);
     json_set_float_serialization_format("%.0f");
@@ -307,69 +325,181 @@ char* rppicomidi::Midi_processor_manager::serialize()
     return serialized_string;
 }
 
-bool rppicomidi::Midi_processor_manager::deserialize(char* json_format)
+char* rppicomidi::Midi_processor_manager::serialize_default()
+{
+    JSON_Value *root_value = json_value_init_object();
+    JSON_Object *root_object = json_value_get_object(root_value);
+    current_preset.serialize(root_object);
+    for (uint8_t preset_num = current_preset.get_min(); preset_num <= current_preset.get_max(); preset_num++) {
+        int idx = 1;
+        JSON_Value* preset_value = json_value_init_object();
+        JSON_Object *preset_object = json_value_get_object(preset_value);
+        for (auto midi_in_cable_processors: midi_in_processors) {
+            JSON_Value *midi_value = json_value_init_object();
+            std::string midi_name = std::string{"MIDI IN"}+std::to_string(idx++);
+            json_object_set_value(preset_object, midi_name.c_str(), midi_value);
+        }
+        idx = 1;
+        for (auto midi_out_cable_processors: midi_out_processors) {
+            JSON_Value *midi_value = json_value_init_object();
+            std::string midi_name = std::string{"MIDI OUT"}+std::to_string(idx++);
+            json_object_set_value(preset_object, midi_name.c_str(), midi_value);
+        }
+        json_object_set_value(root_object, std::to_string(preset_num).c_str(), json_object_get_wrapping_value(preset_object));
+    }
+    json_set_float_serialization_format("%.0f");
+    char* serialized_string = json_serialize_to_string(root_value);
+    json_value_free(root_value);
+
+    return serialized_string;
+
+}
+
+bool rppicomidi::Midi_processor_manager::deserialize_preset(uint8_t preset_num, char* json_format)
 {
     JSON_Value* root_value= json_parse_string(json_format);
     JSON_Object *root_object = NULL;
     bool result = true;
     if (root_value && json_value_get_type(root_value) == JSONObject) {
         root_object = json_value_get_object(root_value);
-        size_t nobjects = json_object_get_count(root_object);
-        const size_t nmidi_in = midi_in_processors.size(); 
-        const size_t nmidi_out = midi_out_processors.size(); 
-        // There should be as many objects as there are MIDI INs and MIDI OUTs
-        if (nobjects == (nmidi_in + nmidi_out)) {
-            printf("deserialize: got %u objects as expected\r\n", nobjects);
-            for (size_t idx=0; result && idx < nobjects; idx++) {
-                const char* label = json_object_get_name(root_object, idx);
-                if (label == nullptr || strlen(label) < 8) {
-                    result = false;
-                    break; // shortest label will be MIDI IN?
-                }
-                const char* ptr = strstr(label, "MIDI IN");
-                if (ptr != nullptr) {
-                    size_t midi_in_port = atoi(ptr+7) - 1;
-                    if (midi_in_port < nmidi_in) {
-                        // Deserialize processors for the specified MIDI IN port
-                        JSON_Value* proc_values = json_object_get_value_at(root_object, idx);
-                        JSON_Object* proc_objects = json_value_get_object(proc_values);
-                        size_t nproc_objects = json_object_get_count(proc_objects);
-                        printf("%u processor objects in MIDI IN%u\r\n", nproc_objects, midi_in_port+1);
+        uint8_t last_preset = json_object_get_number(root_object, current_preset.get_name());
+        // make sure the JSON formatted string to deserialize has current_preset set to preset_num
+        if (last_preset != preset_num) {
+            json_object_set_number(root_object, current_preset.get_name(), preset_num);
+            json_set_float_serialization_format("%.0f");
+            char* serialized_string = json_serialize_to_string(root_value);
+            result = deserialize(serialized_string);
+            json_free_serialized_string(serialized_string);
+        }
+        else {
+            result = deserialize(json_format);
+        }
+    }
+    else {
+        result = false;
+    }
+    if (root_value)
+        json_value_free(root_value);
+    return result;
+}
 
-                        mutex_enter_blocking(&processing_mutex); // Don't allow processing while messing with vectors
-                        midi_in_proc_fns[midi_in_port].clear();
-                        midi_in_processors[midi_in_port].clear();
-                        mutex_exit(&processing_mutex);
+bool rppicomidi::Midi_processor_manager::deserialize(char* json_format)
+{
+    if (!json_format)
+        return false;
+    JSON_Value* root_value= json_parse_string(json_format);
+    JSON_Object *root_object = NULL;
+    bool result = true;
+    if (root_value && json_value_get_type(root_value) == JSONObject) {
+        root_object = json_value_get_object(root_value);
+        // get the last preset number
+        current_preset.deserialize(root_object);
+        uint8_t last_preset = json_object_get_number(root_object, current_preset.get_name());
+        if (last_preset >= current_preset.get_min() && last_preset <= current_preset.get_max()) {
+            JSON_Object* preset = json_object_get_object(root_object, std::to_string(last_preset).c_str());
+            size_t nobjects = json_object_get_count(preset);
+            const size_t nmidi_in = midi_in_processors.size(); 
+            const size_t nmidi_out = midi_out_processors.size(); 
+            // There should be as many objects as there are MIDI INs and MIDI OUTs
+            if (nobjects == (nmidi_in + nmidi_out)) {
+                printf("deserialize: got %u objects as expected\r\n", nobjects);
+                for (size_t idx=0; result && idx < nobjects; idx++) {
+                    const char* label = json_object_get_name(preset, idx);
+                    if (label == nullptr || strlen(label) < 8) {
+                        result = false;
+                        break; // shortest label will be MIDI IN?
+                    }
+                    const char* ptr = strstr(label, "MIDI IN");
+                    if (ptr != nullptr) {
+                        size_t midi_in_port = atoi(ptr+7) - 1;
+                        if (midi_in_port < nmidi_in) {
+                            // Deserialize processors for the specified MIDI IN port
+                            JSON_Value* proc_values = json_object_get_value_at(preset, idx);
+                            JSON_Object* proc_objects = json_value_get_object(proc_values);
+                            size_t nproc_objects = json_object_get_count(proc_objects);
+                            printf("%u processor objects in MIDI IN%u\r\n", nproc_objects, midi_in_port+1);
 
-                        for (size_t proc_idx=0; result && (proc_idx < nproc_objects); proc_idx++) {
-                            const char* proc_label = json_object_get_name(proc_objects, proc_idx);
-                            size_t proc_type_idx = get_midi_processor_idx_by_name(proc_label);
-                            if (proc_type_idx >= get_num_midi_processor_types() ) {
-                                printf("deserialize: new processor name %s not found\r\n", proc_label);
-                                result = false;
-                            }
-                            else {
-                                add_new_midi_processor_by_idx(proc_type_idx, midi_in_port, true);
-                                JSON_Value* setting_values = json_object_get_value_at(proc_objects, proc_idx);
-                                JSON_Object* setting_objects = json_value_get_object(setting_values);
-                                result = midi_in_processors[midi_in_port][proc_idx].proc->deserialize_settings(setting_objects);
-                                if (!result) {
-                                    printf("deserialize: failed to deserialize settings for %s\r\n", proc_label);
+                            mutex_enter_blocking(&processing_mutex); // Don't allow processing while messing with vectors
+                            midi_in_proc_fns[midi_in_port].clear();
+                            midi_in_processors[midi_in_port].clear();
+                            mutex_exit(&processing_mutex);
+
+                            for (size_t proc_idx=0; result && (proc_idx < nproc_objects); proc_idx++) {
+                                const char* proc_label = json_object_get_name(proc_objects, proc_idx);
+                                size_t proc_type_idx = get_midi_processor_idx_by_name(proc_label);
+                                if (proc_type_idx >= get_num_midi_processor_types() ) {
+                                    printf("deserialize: new processor name %s not found\r\n", proc_label);
+                                    result = false;
+                                }
+                                else {
+                                    add_new_midi_processor_by_idx(proc_type_idx, midi_in_port, true);
+                                    JSON_Value* setting_values = json_object_get_value_at(proc_objects, proc_idx);
+                                    JSON_Object* setting_objects = json_value_get_object(setting_values);
+                                    result = midi_in_processors[midi_in_port][proc_idx].proc->deserialize_settings(setting_objects);
+                                    if (!result) {
+                                        printf("deserialize: failed to deserialize settings for %s\r\n", proc_label);
+                                    }
                                 }
                             }
                         }
+                        else {
+                            printf("deserialize: bad MIDI port number %u\r\n", midi_in_port);
+                            result = false;
+                            break;
+                        }
                     }
-                    else {
-                        printf("deserialize: bad MIDI port number %u\r\n", midi_in_port);
-                        result = false;
-                        break;
+                    ptr = strstr(label, "MIDI OUT");
+                    if (ptr != nullptr) {
+                        size_t midi_out_port = atoi(ptr+8) - 1;
+                        if (midi_out_port < nmidi_out) {
+                            // Deserialize processors for the specified MIDI IN port
+                            JSON_Value* proc_values = json_object_get_value_at(preset, idx);
+                            JSON_Object* proc_objects = json_value_get_object(proc_values);
+                            size_t nproc_objects = json_object_get_count(proc_objects);
+                            printf("%u processor objects in MIDI IN%u\r\n", nproc_objects, midi_out_port+1);
+
+                            mutex_enter_blocking(&processing_mutex); // Don't allow processing while messing with vectors
+                            midi_out_proc_fns[midi_out_port].clear();
+                            midi_out_processors[midi_out_port].clear();
+                            mutex_exit(&processing_mutex);
+
+                            for (size_t proc_idx=0; result && (proc_idx < nproc_objects); proc_idx++) {
+                                const char* proc_label = json_object_get_name(proc_objects, proc_idx);
+                                size_t proc_type_idx = get_midi_processor_idx_by_name(proc_label);
+                                if (proc_type_idx >= get_num_midi_processor_types() ) {
+                                    printf("deserialize: new processor name %s not found\r\n", proc_label);
+                                    result = false;
+                                }
+                                else {
+                                    add_new_midi_processor_by_idx(proc_type_idx, midi_out_port, true);
+                                    JSON_Value* setting_values = json_object_get_value_at(proc_objects, proc_idx);
+                                    JSON_Object* setting_objects = json_value_get_object(setting_values);
+                                    result = midi_out_processors[midi_out_port][proc_idx].proc->deserialize_settings(setting_objects);
+                                    if (!result) {
+                                        printf("deserialize: failed to deserialize settings for %s\r\n", proc_label);
+                                    }
+                                }
+                            }
+                        }
+                        else {
+                            printf("deserialize: bad MIDI port number %u\r\n", midi_out_port);
+                            result = false;
+                            break;
+                        }
                     }
                 }
             }
+            else {
+                printf("deserialize: error got %u objects\r\n", nobjects);
+                result = false;
+            }
         }
         else {
-            printf("deserialize: error got %u objects\r\n", nobjects);
+            printf("deserialize: last preset %u not found\r\n", last_preset);
+            result = false;
         }
     }
+    if (root_value)
+        json_value_free(root_value);
     return result;
 }

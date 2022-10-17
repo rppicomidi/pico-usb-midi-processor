@@ -41,7 +41,7 @@
 #include "pico/mutex.h"
 #include "view.h"
 #include "settings_file.h"
-
+#include "setting_number.h"
 namespace rppicomidi
 {
 class Midi_processor_manager
@@ -222,12 +222,29 @@ public:
     void set_screen(Mono_graphics* screen_) {screen = screen_;}
 
     /**
-     * @brief serialize to a JSON-formatted string the settings
-     * of all processors on all MIDI INs and MIDI OUTs
-     * 
-     * @return char* the serialized string
+     * @brief serialize to a JSON-formatted string the current settings
+     * of all processors on all MIDI INs and MIDI OUTs for the specified
+     * preset number.
+     *
+     * @param preset_num the preset number to which the current settings
+     * of all processors will be stored.
+     * @param previous_serialized_string the previous serialization string
+     * for this device as read from the Settings_file or nullptr if no
+     * previous value had been stored.
+     * @return char* the serialized string or nullptr if preset_num is out
+     * of range
+     * @note a side effect of this function is to change the current
+     * preset to preset_num.
      */
-    char* serialize();
+    char* serialize(uint8_t preset_num, char* previous_serialized_string);
+
+    /**
+     * @brief Create a JSON object with current preset to 1 and all presets
+     * empty of processors, serialize it and return the serialized value
+     * 
+     * @return char* the serialized default JSON object
+     */
+    char* serialize_default();
 
     /**
      * @brief deserialize the JSON-formatted string to the settings
@@ -235,11 +252,36 @@ public:
      * or MIDI OUT does not have a processor corresponding to the settings,
      * allocate a new one first
      *
-     * @param json_format 
+     * @param json_format the device settings formatted as a JSON string
      * @return true if deserialization was successful
      * @return false if deserialization failed
+     * @note this method will change the current preset to the value
+     * specified in json_format string
      */
     bool deserialize(char* json_format);
+
+    /**
+     * @brief deserialize a specific preset instead of the serialized
+     * value of the current_preset setting
+     *
+     * @param preset_num the preset number to deserialize
+     * @param json_format the device settings formatted as a JSON string
+     * @return true true if deserialization was successful
+     * @return false false if deserialization failed
+     * @note this method will change the current preset setting to
+     * preset_num. The caller of this function should call serialize
+     * again and store the result so that the current preset setting
+     * is correctly written to flash.
+     */
+    bool deserialize_preset(uint8_t preset_num, char* json_format);
+
+    uint8_t get_current_preset() {return current_preset.get(); }
+
+    bool needs_store();
+
+    bool load_preset(uint8_t preset) { return settings_file.load_preset(preset); }
+    bool store_preset(uint8_t preset) { if (current_preset.set(preset)) return settings_file.store(); return false; }
+    void clear_all_processors();
 private:
     /**
      * @brief rebuild the midi_in_proc_fns midi_out_proc_fns and processors_with_tasks
@@ -269,5 +311,6 @@ private:
     std::vector<Midi_processor*> processors_with_tasks;
     Mono_graphics* screen;
     Settings_file settings_file;
+    Setting_number<uint8_t> current_preset;
 };
 }

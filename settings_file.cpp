@@ -111,22 +111,70 @@ bool rppicomidi::Settings_file::load()
 {
     char* raw_settings = NULL;
     auto error_code = load_settings_string(&raw_settings);
+    bool result = false;
     if (error_code == LFS_ERR_OK) {
         printf("load (%04x-%04x): %s\r\n", vid, pid, raw_settings);
-        bool result = Midi_processor_manager::instance().deserialize(raw_settings);
-        delete[] raw_settings;
-        return result;
+        result = Midi_processor_manager::instance().deserialize(raw_settings);
+    }
+    else {
+        char* default_raw_settings = Midi_processor_manager::instance().serialize_default();
+        if (!default_raw_settings) {
+            printf("Failed to allocate previous raw settings\r\n");
+        }
+        else {
+            printf("loading defaults: %s\r\n", default_raw_settings);
+            result = Midi_processor_manager::instance().deserialize(default_raw_settings);
+            json_free_serialized_string(default_raw_settings);
+        }        
     }
     printf("settings file load error %s\r\n", pico_errmsg(error_code));
     if (raw_settings)
         delete[] raw_settings;
-    return false;
+    return result;
+}
+
+bool rppicomidi::Settings_file::load_preset(uint8_t next_preset)
+{
+    char* raw_settings = NULL;
+    auto error_code = load_settings_string(&raw_settings);
+    bool result = false;
+    if (error_code == LFS_ERR_OK) {
+        printf("load (%04x-%04x): %s\r\n", vid, pid, raw_settings);
+        result = Midi_processor_manager::instance().deserialize_preset(next_preset, raw_settings);
+    }
+    else {
+        char* default_raw_settings = Midi_processor_manager::instance().serialize_default();
+        if (!default_raw_settings) {
+            printf("Failed to allocate previous raw settings\r\n");
+        }
+        else {
+            printf("loading defaults: %s\r\n", default_raw_settings);
+            result = Midi_processor_manager::instance().deserialize_preset(next_preset, default_raw_settings);
+            json_free_serialized_string(default_raw_settings);
+        }        
+    }
+    printf("settings file load error %s\r\n", pico_errmsg(error_code));
+    if (raw_settings)
+        delete[] raw_settings;
+    return result;
 }
 
 int rppicomidi::Settings_file::store()
 {
+    // Get previous settings values
+    char* previous_raw_settings = NULL;
+    int error_code = load_settings_string(&previous_raw_settings);
+    if (error_code != LFS_ERR_OK) {
+        if (previous_raw_settings)
+            delete[] previous_raw_settings;
+        previous_raw_settings = Midi_processor_manager::instance().serialize_default();
+        if (!previous_raw_settings) {
+            printf("Failed to allocate previous raw settings\r\n");
+            return error_code;
+        }
+    }
     // Serialize to a string for storage
-    char* settings_str = Midi_processor_manager::instance().serialize();
+    char* settings_str = Midi_processor_manager::instance().serialize(Midi_processor_manager::instance().get_current_preset(), previous_raw_settings);
     if (settings_str) {
         printf("store (%04x-%04x): %s\r\n",vid,pid, settings_str);
     }
@@ -134,7 +182,7 @@ int rppicomidi::Settings_file::store()
         return LFS_ERR_NOMEM;
     }
     // Move current settings file to a backup file if current settings file exists
-    int error_code = pico_mount(false);
+    error_code = pico_mount(false);
     if (error_code != 0) {
         free((void*)settings_str);
         printf("unexpected error %s mounting flash\r\n", pico_errmsg(error_code));

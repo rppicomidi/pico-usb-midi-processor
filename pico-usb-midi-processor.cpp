@@ -106,7 +106,7 @@ rppicomidi::Pico_usb_midi_processor::Pico_usb_midi_processor()  : addr{OLED_ADDR
     oled_screen{&ssd1306, Display_rotation::Landscape180},                        // set up the screen for rotated landscape orientation
     midi_dev_addr{0},
     midi_device_status{MIDI_DEVICE_NOT_INITIALIZED},
-    home_screen{oled_view_manager, oled_screen, "PICO MIDI PROCESSOR No Connected Device"},
+    home_screen{oled_screen, "PICO MIDI PROCESSOR No Connected Device"},
     nav_buttons{oled_view_manager}
 {
     gpio_init(LED_GPIO);
