@@ -227,6 +227,18 @@ Plug your keyboard or other MIDI device to the PUMP's USB Host Port.
 You should see the device name on the top one or two lines of the
 OLED followed by the current preset number, followed by a list of MIDI IN and MIDI OUT ports that the
 device normally exposes to your PC's or Mac's USB Host port.
+
+For example, when I connect my keyboard to the PUMP, the
+display shows:
+
+```
+  Arturia Keylab
+   Essential 88
+Preset:1
+Setup MIDI IN 1
+Setup MIDI IN 2
+```
+
 `Preset: 1` should show in reverse video the first time you
 every connect a device. MIDI IN and MIDI
 OUT are from the USB Host's (the PC's or MAC's) perspective.
@@ -238,6 +250,17 @@ right will appear to let you know you can navigate beyond what
 is visible. The display will scroll as required. If you want
 to scroll beyond what is visible in one go, press and hold the
 Shift button before you press the Up or Down button.
+
+For example, if I scroll the home screen menu all the way
+to the end, I see
+
+```
+  Arturia Keylab
+   Essential 88
+Setup MIDI IN 2
+Setup MIDI OUT 1
+Setup MIDI OUT 2
+```
 
 If a menu item is highlighted, you can press the Enter button
 to go one menu level deeper or enter edit mode for the
@@ -273,10 +296,13 @@ or decrement interval. If there are multiple parameters on a line,
 use a the Left button or Right button to choose the parameter to
 increment or decrement.
 
+If a processor setting has two number fields in it, you can
+navigate between the fields using the left and right buttons.
+
 Once you start editing presets, the home screen will show
-Preset:1[M] or similar. The "[M]" means that the current
+`Preset:1[M]` or similar. The `[M]` means that the current
 preset has been modified. If you want to save it, highlight
-the Preset:1[M] line on the home screen and press Enter.
+the `Preset:1[M]` line on the home screen and press Enter.
 You will see the Preset screen
 
 ```
@@ -288,7 +314,7 @@ Reset next preset
 ```
 To save the changes to the current preset, navigate to `Save next preset` and press Enter. The preset will be saved and
 the UI will return to the home screen. You will note that
-the "[M]" is no longer displayed after the preset number.
+the `[M]` is no longer displayed after the preset number.
 That means the current preset is stored in flash.
 
 If you change the Next Preset value in the preset screen,
@@ -323,3 +349,33 @@ exactly that. If you add a processor to PUMP MIDI IN port, then
 the feedback process gets automatically added to the corresponding PUMP
 MIDI OUT port. This "feedback" process does not show on the MIDI OUT
 Setup on the OLED screen, but it is there.
+
+## List of MIDI Processors
+- Channel Button Remap: convert the 2nd byte of a 3-byte
+MIDI channel message to a different value; in the opposite
+data direction, convert the second value back to the original
+value. This is useful for remapping buttons that have LEDs
+associated with them. For example, Mackie Control compatible
+control surfaces use Channel Note On messages to convey
+button presses to the host. The host will send back the same
+channel message with velocity 0 to turn the button's LED off. It will send Note On velocity 127 to turn the LED on.
+- Channel Message Remap: same as Channel Button Remap without
+the feedback path.
+- MC Fader Pickup: Mackie Control compatible control surfaces
+send fader movements embedded in Channel Pitch Bend messages.
+If you move a fader and the host DAW is not synchronized to
+it, then the DAW fader position will jump. To prevent jumps,
+use this processor. Whenever the DAW sends a fader position
+to the PUMP, the PUMP will record that position and will
+not forward a fader movement from the attached MIDI device
+until the fader position moves past the last position the
+DAW sent.
+- Transpose: if a channel note message passes into the
+processor with the correct MIDI channel and within the
+Min MIDI note and Max MIDI note note number range, then
+the processor will add Halfstep delta halfsteps to the
+note number. If the Halfstep delta value is negative,
+then the processor will subtract halfsteps from the
+note number.
+- More processors are coming. I have not gotten to them
+yet.
