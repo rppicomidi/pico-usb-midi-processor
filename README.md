@@ -2,10 +2,15 @@
 
 The Pico USB MIDI Processor, or PUMP, is a Raspberry Pi Pico-based
 general purpose device that processes USB MIDI data between a USB
-Host such as a PC or Mac and a USB MIDI device such as a keyboard
-or control surface. The PUMP has a simple OLED and button
-graphical user interface, and it will retain setting between power
-cycles.
+Host such as a PC or Mac and an external USB MIDI device such as a keyboard
+or control surface. It has both a USB A Host connector that connects to your external MIDI device and a micro USB Device port that connects to your PC.
+
+![](doc/pico-usb-midi-processor-prototype.jpg)
+
+The PUMP has a basic UI made from
+a 128x64 mono OLED display, 4 directional buttons (white), an Enter button (green), a Shift button (yellow) and a Back button (red). The Up and Down buttons double as increment and
+decrement buttons, and the Left button doubles as a delete
+from the list button.
 
 The PUMP inspects and can modify or filter out every USB MIDI packet
 between the MIDI device and USB host on every USB MIDI IN and MIDI OUT
@@ -19,13 +24,19 @@ filter or processor for the MIDI data. For example
 - Filter out Real-time messages
 - and so on
 
-You can stack as many processors as you want to make a complex
+You can add as many MIDI processing algorithms on as you want to make a complex
 processing chain for any MIDI port. The software framework is
 flexible enough to allow new processing functions to be added.
 
+The PUMP uses some of the Pico board's program flash to store
+up to 8 presets for each unique external MIDI device
+connected to it. Each new external MIDI device gets its own
+set of 8 presets stored, so you will likely never run out
+of presets.
+
 # Hardware
 
-The PUMP is based on a single Raspberry Pi Pico board. It uses the
+The PUMP uses the
 native USB hardware to implment the USB MIDI device, and it uses
 the Pico-PIO-USB project software plus a modified tinyusb stack
 to implement the USB MIDI host. You set up the hardware to process
@@ -35,18 +46,46 @@ select plus a "Back/Home" button and a "Shift" button. I used 7
 descrete buttons, but there are a number of ready-made assemblies
 that use a 5-way "joystick" style switch for up/down/left/right/select
 plus two more buttons to provide the 7-buttons. The OLED is a very
-common I2C module that you can buy from any number of sources in
-with white, blue or yellow dots.
+common I2C module that you can buy from any number of sources. You can usually get it with white, blue or yellow dots.
 
 The PUMP uses some of the Pico board's program memory flash chip
-to store device settings, so the PUMP can remember the last
-configuration for every device that was attached previously (until
-it runs out of setting storage).
+to store device settings, so the PUMP can remember the up to 8 different
+configurations for each device that was attached previously (until it runs out of setting storage).
 
 The PUMP uses 7 pins for the buttons, 2 pins for the USB Host, 2
 pins for the OLED's I2C port, an 2 pins for a debug UART.
 
-A photo of the hardware is below. 
+Wiring consists of the USB Host port, the buttons, the display, and optionally and the debug port. Here is a crude wiring diagram with the debug hardware not shown ![](doc/pico-usb-midi-processor_wiring.png).
+
+## Wiring the USB Host port
+
+I used a [Sparkfun CAB-10177](https://www.sparkfun.com/products/10177) with the green and white
+wires (D+ and D- signals) swapped on the 4-pin female header connector. I soldered a 4-pin male header
+to pins 1-3 of the Pico board and left one of the pins hanging off the edge of the board. I soldered
+a wire from that pin hanging off the edge of the board to Pin 40 of the Pico board (VBus). I then
+plugged the 4-pin female header connector so the black wire (ground) connects to Pin 3 of the Pico
+board, the red wire connects to pin hanging off the edge of the Pico board, the green wire connects
+to pin 1 of the Pico board, and the white wire connects to pin 2 of the Pico board. If you want to
+add series termination resistors to D+ and D-, resistors between 22 and 33 ohms are probably close. I didn't bother and it seemed good enough for my testing. Here is a photo of
+just the USB host wiring ![](doc/pico-usb-midi-processor-usb-host.jpg)
+
+## Wiring the buttons
+
+The software detects a button press as a GP pin shorted to ground. The software configures each button GP pin to have the on-chip pull-up resistor active. Connect one pin of each of the 7 buttons to ground and connect the remaining pin of the button to its own GP input. I used pin 13 of the Pico board for ground, pins 9-12 for Right, Shift, Down and Enter, and pins 14-16 for Left, Up and Back.
+
+## Wiring the Display
+
+Look very carefully at your OLED module. The diagram shows
+one possible pinout. Many have VCC and GND swapped. Do
+not hook these up backwards or your display may be destroyed.
+There will be 4 pins on the top of the display labeled VCC, GND, SCL and SDA. The VCC pin goes to the 3.3V regulated supply output on Pico pin 36. The GND pin goes to the GND pin on Pico pin 23. SCL and SDA go to Pico Pins 24 and 25,
+respectively.
+
+## Wiring the Picoprobe
+
+You might not need to use a Picoprobe for debugging if you
+are just building the code and using it. I find a Picoprobe
+handy for debug. Because the USB host uses Pico pins 1 and 2, I use pins Pico pins 21 and 22 for the debug UART. The SWCLK, GND and SWDIO pins on the bottom of the board wire to the corresponding pins on the Pico Probe.
 
 # Software Build Instructions
 ## Set up your environment
@@ -186,21 +225,27 @@ No Connected Device
 
 Plug your keyboard or other MIDI device to the PUMP's USB Host Port.
 You should see the device name on the top one or two lines of the
-OLED followed by a list of MIDI IN and MIDI OUT ports that the
+OLED followed by the current preset number, followed by a list of MIDI IN and MIDI OUT ports that the
 device normally exposes to your PC's or Mac's USB Host port.
-`SETUP MIDI IN 1` should show in reverse video. MIDI IN and MIDI
+`Preset: 1` should show in reverse video the first time you
+every connect a device. MIDI IN and MIDI
 OUT are from the USB Host's (the PC's or MAC's) perspective.
 
-If you press the up or down buttons, you can navigate the list
-of ports.  If there are more than 3 total MIDI IN or MIDI OUT ports,
+If you press the up or down buttons, you can navigate the menu.
+If there are more than 2 total MIDI IN or MIDI OUT ports,
 then all won't fit on the screen. A vertical progress bar on the
 right will appear to let you know you can navigate beyond what
 is visible. The display will scroll as required. If you want
 to scroll beyond what is visible in one go, press and hold the
 Shift button before you press the Up or Down button.
 
-If you press the select button, you can set up the
-processing for the highlighted port.
+If a menu item is highlighted, you can press the Enter button
+to go one menu level deeper or enter edit mode for the
+highlighted menu item.
+
+If you press the Back button, the UI will go back one screen. If you hold the Shift button and press the Back button, then the UI will return to the home screen.
+
+If you press the Enter button on when a menu item that starts "Setup MIDI" is shown in reverse video, you can set up the processing for that MIDI port.
 
 In the Setup screen, you add a processor by pressing the Select
 button whilst `Add new processor...` is highlighted. A list of
@@ -227,6 +272,29 @@ hold shift and the pressing Up or Down will increase the increment
 or decrement interval. If there are multiple parameters on a line,
 use a the Left button or Right button to choose the parameter to
 increment or decrement.
+
+Once you start editing presets, the home screen will show
+Preset:1[M] or similar. The "[M]" means that the current
+preset has been modified. If you want to save it, highlight
+the Preset:1[M] line on the home screen and press Enter.
+You will see the Preset screen
+
+```
+ Current Preset:1[M]
+Next Preset:1
+Save next preset
+Load next preset
+Reset next preset
+```
+To save the changes to the current preset, navigate to `Save next preset` and press Enter. The preset will be saved and
+the UI will return to the home screen. You will note that
+the "[M]" is no longer displayed after the preset number.
+That means the current preset is stored in flash.
+
+If you change the Next Preset value in the preset screen,
+you can save the current state to that new preset number,
+you can load the settings for that preset number, or
+you can start with a new blank preset with that number.
 
 ## Processing paths
 
