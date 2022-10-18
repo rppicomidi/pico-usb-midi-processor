@@ -36,6 +36,7 @@
 #include "view_manager.h"
 
 #include "pio_usb.h"
+#include "hardware/watchdog.h"
 
 #include "tusb.h"
 #include "bsp/board.h"
@@ -321,8 +322,9 @@ void tuh_midi_mount_cb(uint8_t dev_addr, uint8_t in_ep, uint8_t out_ep, uint8_t 
 void tuh_midi_umount_cb(uint8_t dev_addr, uint8_t instance)
 {
     rppicomidi::Pico_usb_midi_processor::instance().midi_dev_addr = 0;
-    set_descriptors_uncloned();
     TU_LOG1("MIDI device address = %d, instance = %d is unmounted\r\n", dev_addr, instance);
+    set_descriptors_uncloned();
+    watchdog_reboot(0,0,10); // wait 10 ms and then reboot
 }
 
 void tuh_midi_rx_cb(uint8_t dev_addr, uint32_t num_packets)
