@@ -44,10 +44,10 @@ rppicomidi::Midi_processor_transpose_view::Midi_processor_transpose_view(Mono_gr
     auto transpose_delta = new Int_spinner_menu_item<int8_t>("Halfstep delta: ", screen, font, 3, 3, false, Midi_processor_transpose::static_get_transpose_delta, Midi_processor_transpose::static_incr_transpose_delta, proc_);
     assert(transpose_delta);
     menu.add_menu_item(chan);
+    menu.add_menu_item(transpose_delta);
     menu.add_menu_item(display_format_item);
     menu.add_menu_item(min_note);
     menu.add_menu_item(max_note);
-    menu.add_menu_item(transpose_delta);
 }
 
 void rppicomidi::Midi_processor_transpose_view::draw()
