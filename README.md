@@ -37,6 +37,20 @@ connected to it. Each new external MIDI device gets its own
 set of 8 presets stored, so you will likely never run out
 of presets.
 
+# Disclaimers
+
+This project requires correctly soldering a USB host port connector
+to a Raspberry Pi Pico board. The circuit described here has no current
+limiting, ESD protection, or other safeguards. Measure voltages carefully
+and please don't hook this to your expensive computer and MIDI equipment
+until you have done some testing with at least some basic test equipment.
+
+Also, any brand name stuff I mention in this README file is just documentation
+of what I did. This is not an advertisement. I don't get paid to do this.
+
+If you find issues with this document or with the code, please report them on
+this project's [github page](https://github.com/rppicomidi/pico-usb-midi-processor).
+
 # Hardware
 
 The PUMP uses the native USB hardware to implement the USB MIDI device
