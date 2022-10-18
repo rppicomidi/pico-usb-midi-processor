@@ -39,7 +39,7 @@ of presets.
 
 # Hardware
 
-The PUMP uses the native USB hardware to implment the USB MIDI device
+The PUMP uses the native USB hardware to implement the USB MIDI device
 interface, and it uses the Pico-PIO-USB project software plus a modified
 tinyusb stack to implement the USB MIDI host interface. You set up the
 hardware to process MIDI using a small SSD1306-based 128x64 dot monochrome
@@ -57,10 +57,10 @@ configurations for each device that was attached previously (until it runs
 out of setting storage, which is unlikely).
 
 The PUMP uses 7 pins for the buttons, 2 pins for the USB Host, 2
-pins for the OLED's I2C port, an 2 pins for a debug UART.
+pins for the OLED's I2C port, and 2 pins for a debug UART.
 
 Wiring consists of the USB Host port, the buttons, the display, and optionally
-and the debug port. Here is a crude wiring diagram with the debug hardware not
+the debug port. Here is a crude wiring diagram with the debug hardware not
 shown ![](doc/pico-usb-midi-processor_wiring.png).
 
 ## Wiring the USB Host port
@@ -233,20 +233,22 @@ Building using VS Code should be straightforward because I put a
 
 ## Quick Start
 Plug the PUMP's micro USB device port to a PC, Mac or other USB host.
-The screen should show
+The screen should show the home screen of the UI. If you have no MIDI
+device connected to the PUMP's USB host port, you will see:
 
 ```
 PICO MIDI PROCESSOR
 No Connected Device
 ```
 
-Plug your keyboard or other MIDI device to the PUMP's USB Host Port.
-You should see the device name on the top one or two lines of the
-OLED followed by the current preset number, followed by a list of MIDI IN
-and MIDI OUT ports that the device normally exposes to your PC's or Mac's USB Host port.
+If you plug your keyboard or other MIDI device to the PUMP's USB Host Port,
+the home screen will change to display the device name on the top one or
+two lines of the OLED followed by the current preset number, followed
+by a list of MIDI IN and MIDI OUT ports that the device normally exposes
+to your PC's or Mac's USB Host port.
 
 For example, when I connect my keyboard to the PUMP, the
-display shows:
+display shows the home screen:
 
 ```
   Arturia Keylab
@@ -256,8 +258,8 @@ Setup MIDI IN 1
 Setup MIDI IN 2
 ```
 
-`Preset: 1` should show in reverse video the first time you
-every connect a device. MIDI IN and MIDI
+`Preset:1` should show in reverse video the after you
+connect a device. MIDI IN and MIDI
 OUT are from the USB Host's (the PC's or MAC's) perspective.
 
 If you press the Up or Down buttons, you can navigate the menu.
@@ -290,10 +292,10 @@ UI will return to the home screen.
 If you press the Enter button on when a menu item that starts "Setup MIDI"
 is shown in reverse video, you can set up the processing for that MIDI port.
 
-In the Setup screen, you add a processor by pressing the Enter
-button whilst `Add new processor...` is highlighted. A list of
-available processors will show up. Use the Up and Down buttons
-to the processor you want to add and then press the Enter button
+In the MIDI Port Setup screen, you add a processor to that port's
+processing chain by pressing the Enter button whilst `Add new processor...`
+is highlighted. A list of available processors will show up. Use the Up and
+Down buttons to choose the processor you want to add and then press the Enter button
 to add it. The UI will return to the MIDI port setup screen. The
 screen will show the processor added right above `Add new processor...`
 If you changed your mind before you added the
@@ -310,15 +312,17 @@ You adjust most processor parameters by using the Up and Down buttons
 to choose the paramater, then press the Enter button
 to edit the paramater. If it is a toggle parameter (like the Display
 Decimal/Hex format setting), pressing the Enter button just
-toggles the parameter. Otherwise, pressing Enter will highlight
-the value you can change. In this edit mode, the Up and Down buttons
-increment or decrement the paramter value. Holding the Up or Down
-buttons will repeat the increment or decrement action. Press and
-hold shift and the pressing Up or Down will increase the increment
-or decrement interval. If there are multiple parameters on a line,
-use a the Left button or Right button to choose the parameter to
-increment or decrement. When you are done editing parameters in
-edit mode, press the Enter button again.
+toggles the parameter. If it is a parameter you choose from a list,
+then pressing Enter will change to a screen with the list of items
+to choose; navigate to the item you want and press Enter to select it.
+Otherwise, pressing Enter will highlight the value you can change. In
+this edit mode, the Up and Down buttons increment or decrement the
+paramter value. Holding the Up or Down buttons will repeat the increment
+or decrement action. Press and hold Shift and then pressing Up or Down
+will increase the increment or decrement interval. If there are
+multiple parameters on a line, use the Left button or Right
+button to choose the parameter to increment or decrement. When you are
+done editing parameters in edit mode, press the Enter button again.
 
 Once you start editing presets, the home screen will show
 `Preset:1[M]` or similar. The `[M]` means that the current
@@ -361,16 +365,16 @@ the right order.
 Some processors have "feedback" processing. For example, if you
 remap a control surface button that has an LED, usually the DAW
 will use the same message to control the LED that the control
-surface sends to the DAW to indicate button press. For example,
-if pressing the button sends NOTE ON 50, to the DAW, then the
+surface sends to the DAW to indicate button press. For this example,
+if pressing the control surface button sends NOTE ON 50, to the DAW, then the
 DAW will send back NOTE ON 50 to light the button's LED. If
 you assign a PUMP processor to remap control surface button's MIDI note
 number to something else, then that processor needs a feedback
 process to map the message from the DAW back to the message the
 control surface expects. The `Channel Button Remap` processor does
-exactly that. If you add a processor to PUMP MIDI IN port, then
+exactly that. If you add a processor to PUMP MIDI IN x port, then
 the feedback process gets automatically added to the corresponding PUMP
-MIDI OUT port. This "feedback" process does not show on the MIDI OUT
+MIDI OUT x port. This "feedback" process does not show on the MIDI OUT
 Setup on the OLED screen, but it is there.
 
 ## List of MIDI Processors
