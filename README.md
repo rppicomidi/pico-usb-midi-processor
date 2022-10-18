@@ -43,10 +43,10 @@ The PUMP uses the native USB hardware to implment the USB MIDI device
 interface, and it uses the Pico-PIO-USB project software plus a modified
 tinyusb stack to implement the USB MIDI host interface. You set up the
 hardware to process MIDI using a small SSD1306-based 128x64 dot monochrome
-OLED display plus 7 buttons: 5 buttons for up, down, left, right, and
-select plus a "Back/Home" button and a "Shift" button. I used 7
+OLED display plus 7 buttons: 5 buttons for Up, Down, Left, Right, and
+Enter plus a "Back/Home" button and a "Shift" button. I used 7
 discrete buttons, but there are a number of ready-made assemblies
-that use a 5-way "joystick" style switch for up/down/left/right/select
+that use a 5-way "joystick" style switch for Up/Down/Left/Right/Enter
 plus two more buttons to provide the 7-buttons. The OLED is a very
 common I2C module that you can buy from any number of sources. You can
 usually get it with white, blue or yellow dots.
@@ -260,7 +260,7 @@ Setup MIDI IN 2
 every connect a device. MIDI IN and MIDI
 OUT are from the USB Host's (the PC's or MAC's) perspective.
 
-If you press the up or down buttons, you can navigate the menu.
+If you press the Up or Down buttons, you can navigate the menu.
 If there are more than 2 total MIDI IN or MIDI OUT ports,
 then all won't fit on the screen. A vertical progress bar on the
 right will appear to let you know you can navigate beyond what
@@ -290,10 +290,10 @@ UI will return to the home screen.
 If you press the Enter button on when a menu item that starts "Setup MIDI"
 is shown in reverse video, you can set up the processing for that MIDI port.
 
-In the Setup screen, you add a processor by pressing the Select
+In the Setup screen, you add a processor by pressing the Enter
 button whilst `Add new processor...` is highlighted. A list of
 available processors will show up. Use the Up and Down buttons
-to the processor you want to add and then press the Select button
+to the processor you want to add and then press the Enter button
 to add it. The UI will return to the MIDI port setup screen. The
 screen will show the processor added right above `Add new processor...`
 If you changed your mind before you added the
@@ -302,22 +302,23 @@ setup screen. To go all the way back to the home screen,
 hold the Shift button and then press the Back/Home button.
 
 If you added a processor by mistake, highlight the processor using
-the Up and Down buttons and then press the left button to delete it.
+the Up and Down buttons and then press the Left button to delete it.
 There is no confirmation, so be careful. You can configure the processor
-by using the Up or Down buttons to highlight it, then pressing select.
+by using the Up or Down buttons to highlight it, then pressing Enter.
 
 You adjust most processor parameters by using the Up and Down buttons
-to choose the paramater, then press the Select button
-to edit the paramater. In this edit mode, the Up and Down buttons
+to choose the paramater, then press the Enter button
+to edit the paramater. If it is a toggle parameter (like the Display
+Decimal/Hex format setting), pressing the Enter button just
+toggles the parameter. Otherwise, pressing Enter will highlight
+the value you can change. In this edit mode, the Up and Down buttons
 increment or decrement the paramter value. Holding the Up or Down
 buttons will repeat the increment or decrement action. Press and
 hold shift and the pressing Up or Down will increase the increment
 or decrement interval. If there are multiple parameters on a line,
 use a the Left button or Right button to choose the parameter to
-increment or decrement.
-
-If a processor setting has two number fields in it, you can
-navigate between the fields using the left and right buttons.
+increment or decrement. When you are done editing parameters in
+edit mode, press the Enter button again.
 
 Once you start editing presets, the home screen will show
 `Preset:1[M]` or similar. The `[M]` means that the current
@@ -354,7 +355,8 @@ The PUMP will process every MIDI packet
 through every processor you add to a MIDI port before sending it
 on to its destination. Processing is done in the same order you
 added it in the GUI, so if you are doing something complex where
-the order of processing matters, be sure to add the processors in the right order.
+the order of processing matters, be sure to add the processors in
+the right order.
 
 Some processors have "feedback" processing. For example, if you
 remap a control surface button that has an LED, usually the DAW
@@ -380,7 +382,17 @@ associated with them. For example, Mackie Control compatible
 control surfaces use Channel Note On messages to convey
 button presses to the host. The host will send back the same
 channel message with velocity 0 to turn the button's LED off.
-It will send Note On velocity 127 to turn the LED on.
+It will send Note On velocity 127 to turn the LED on. This
+processor can convert or filter any of the 128 different
+channel message values for a given type, (e.g., note, CC, etc.)
+In the settings screen you can display the note number, CC
+number, etc. in Decimal or Hex format. The screen shows a
+forward direction remap as`vv->yy`, where `vv` is the original
+note number, CC number, etc. and `yy` is the new value. The
+feedback path will convert `yy` to `vv`. If you want to filter out
+a particular `vv` so the message is not passed on at all,
+increment the `yy` value until it shows `**`. The same
+works in reverse for the feedback path.
 - Channel Message Remap: same as Channel Button Remap without
 the feedback path.
 - MC Fader Pickup: Mackie Control compatible control surfaces
@@ -398,6 +410,7 @@ Min MIDI note and Max MIDI note note number range, then
 the processor will add Halfstep delta halfsteps to the
 note number. If the Halfstep delta value is negative,
 then the processor will subtract halfsteps from the
-note number.
+note number. You can view the min and max note numbers
+in Decimal or Hex format in the settings screen.
 - More processors are coming. I have not gotten to them
 yet.
