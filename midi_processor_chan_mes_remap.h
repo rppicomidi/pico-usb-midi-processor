@@ -60,6 +60,7 @@ public:
         mutex_exit(&processing_mutex);
     }
     bool process(uint8_t *packet) final { return process_internal(packet, 0, 1); }
+    virtual bool has_feedback_process() {return false; }
     const std::vector<std::string>* get_all_possible_channel_message_types() const { return message_type.get_all_possible_values(); }
     bool set_message_type(size_t idx) { dirty = message_type.get_ivalue() != (int)idx; return message_type.set(idx); }
     void get_message_type(std::string &typestr) { message_type.get(typestr); }
