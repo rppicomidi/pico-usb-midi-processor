@@ -70,8 +70,9 @@ bool rppicomidi::Midi_processor_transpose::deserialize_settings(JSON_Object *roo
 
     if (!result || !transpose_delta.deserialize(root_object))
         result = false;
-    if (result)
+    if (result) {
         dirty = false;
+    }
     return result;
 }
 
@@ -81,4 +82,5 @@ void rppicomidi::Midi_processor_transpose::load_defaults()
     min_note.set_default();
     max_note.set_default();
     transpose_delta.set_default();
+    dirty = false;
 }

@@ -279,8 +279,24 @@ public:
 
     bool needs_store();
 
-    bool load_preset(uint8_t preset) { return settings_file.load_preset(preset); }
-    bool store_preset(uint8_t preset) { if (current_preset.set(preset)) return settings_file.store(); return false; }
+    bool load_preset(uint8_t preset)
+    {
+        bool result = settings_file.load_preset(preset);
+        if (result) {
+            dirty = false;
+        }
+        return result;
+    }
+    bool store_preset(uint8_t preset)
+    {   bool result = false;;
+        if (current_preset.set(preset)) {
+            result = settings_file.store();
+            if (result) {
+                dirty = false;
+            }
+        }
+        return result;
+    }
     void clear_all_processors();
 private:
     /**
@@ -312,5 +328,6 @@ private:
     Mono_graphics* screen;
     Settings_file settings_file;
     Setting_number<uint8_t> current_preset;
+    bool dirty;
 };
 }

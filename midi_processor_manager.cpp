@@ -30,7 +30,7 @@
 #include "midi_processor_chan_mes_remap_settings_view.h"
 
 uint16_t rppicomidi::Midi_processor_manager::unique_id = 0;
-rppicomidi::Midi_processor_manager::Midi_processor_manager() : screen{nullptr}, current_preset{"current preset",1,8,1}
+rppicomidi::Midi_processor_manager::Midi_processor_manager() : screen{nullptr}, current_preset{"current preset",1,8,1}, dirty{true}
 {
     // Note: try to add new processor types to this list alphabetically
     mutex_init(&processing_mutex);
@@ -86,6 +86,7 @@ rppicomidi::Midi_processor_settings_view* rppicomidi::Midi_processor_manager::ad
             midi_out_processors[cable].push_back({proc, view});
         }
         build_processor_structures();
+        dirty = true;
         mutex_exit(&processing_mutex);
         retview = view;
     }
@@ -121,6 +122,7 @@ void rppicomidi::Midi_processor_manager::delete_midi_processor_by_idx(int idx, u
             }
         }
     }
+    dirty = true;
     mutex_exit(&processing_mutex);
 }
 
@@ -171,7 +173,6 @@ void rppicomidi::Midi_processor_manager::build_processor_structures()
             if (midi_in_proc.proc->has_task()) {
                 processors_with_tasks.push_back(midi_in_proc.proc);
             }
-            midi_in_proc.proc->set_not_saved();
         }
     }
 
@@ -245,7 +246,6 @@ void rppicomidi::Midi_processor_manager::task()
 
 bool rppicomidi::Midi_processor_manager::needs_store()
 {
-    bool dirty = false;
     for (auto in_cable = midi_in_processors.begin(); !dirty && in_cable != midi_in_processors.end(); in_cable++) {
         for (auto proc = in_cable->begin(); !dirty && proc != in_cable->end(); proc++) {
             printf("processor %s needs store=%s\r\n",proc->proc->get_name(), proc->proc->not_saved() ? "True":"False");
@@ -317,11 +317,11 @@ char* rppicomidi::Midi_processor_manager::serialize(uint8_t preset_num, char* pr
             }
         }
     }
+    dirty = false;
     mutex_exit(&processing_mutex);
     json_set_float_serialization_format("%.0f");
     char* serialized_string = json_serialize_to_string(root_value);
     json_value_free(root_value);
-
     return serialized_string;
 }
 
@@ -380,6 +380,8 @@ bool rppicomidi::Midi_processor_manager::deserialize_preset(uint8_t preset_num, 
     }
     if (root_value)
         json_value_free(root_value);
+    if (result)
+        dirty = false;
     return result;
 }
 
@@ -430,6 +432,7 @@ bool rppicomidi::Midi_processor_manager::deserialize(char* json_format)
                                 if (proc_type_idx >= get_num_midi_processor_types() ) {
                                     printf("deserialize: new processor name %s not found\r\n", proc_label);
                                     result = false;
+                                    break;
                                 }
                                 else {
                                     add_new_midi_processor_by_idx(proc_type_idx, midi_in_port, true);
@@ -438,6 +441,7 @@ bool rppicomidi::Midi_processor_manager::deserialize(char* json_format)
                                     result = midi_in_processors[midi_in_port][proc_idx].proc->deserialize_settings(setting_objects);
                                     if (!result) {
                                         printf("deserialize: failed to deserialize settings for %s\r\n", proc_label);
+                                        break;
                                     }
                                 }
                             }
@@ -469,6 +473,7 @@ bool rppicomidi::Midi_processor_manager::deserialize(char* json_format)
                                 if (proc_type_idx >= get_num_midi_processor_types() ) {
                                     printf("deserialize: new processor name %s not found\r\n", proc_label);
                                     result = false;
+                                    break;
                                 }
                                 else {
                                     add_new_midi_processor_by_idx(proc_type_idx, midi_out_port, true);
@@ -477,6 +482,7 @@ bool rppicomidi::Midi_processor_manager::deserialize(char* json_format)
                                     result = midi_out_processors[midi_out_port][proc_idx].proc->deserialize_settings(setting_objects);
                                     if (!result) {
                                         printf("deserialize: failed to deserialize settings for %s\r\n", proc_label);
+                                        break;
                                     }
                                 }
                             }
@@ -501,5 +507,7 @@ bool rppicomidi::Midi_processor_manager::deserialize(char* json_format)
     }
     if (root_value)
         json_value_free(root_value);
+    if (result)
+        dirty = false;
     return result;
 }

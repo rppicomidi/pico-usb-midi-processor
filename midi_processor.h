@@ -36,7 +36,7 @@ namespace rppicomidi
 class Midi_processor
 {
 public:
-    Midi_processor(const char* name_, uint16_t unique_id_) : unique_id{unique_id_}
+    Midi_processor(const char* name_, uint16_t unique_id_) : dirty{true}, unique_id{unique_id_}
     {
         strncpy(name,name_,max_name_length);
         name[max_name_length] = '\0';
