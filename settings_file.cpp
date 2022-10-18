@@ -127,7 +127,8 @@ bool rppicomidi::Settings_file::load()
             json_free_serialized_string(default_raw_settings);
         }        
     }
-    printf("settings file load error %s\r\n", pico_errmsg(error_code));
+    if (error_code != LFS_ERR_OK)
+        printf("settings file load error %s\r\n", pico_errmsg(error_code));
     if (raw_settings)
         delete[] raw_settings;
     return result;
@@ -257,7 +258,7 @@ int rppicomidi::Settings_file::store()
         return error_code;
     }
     else if ((size_t)error_code < strlen(settings_str)) {
-        printf("store: WTF error_code=%d strlen(settings_str)=%u\r\n", error_code, strlen(settings_str));
+        printf("store: Only %d bytes stored out of %u\r\n", error_code, strlen(settings_str));
         // hmm. no idea why that should happen
         return LFS_ERR_IO;
     }

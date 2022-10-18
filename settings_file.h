@@ -84,7 +84,9 @@ public:
      * @brief If the current settings are different from the settings in flash,
      * write the settings to the flash
      *
-     * @return true if settings in flash match the current Model
+     * @return 0 if successful, an negative number if there was an error and
+     * a positive number if the number of bytes stored does not match the expected
+     * number of bytes
      * @note this function will disable interrupts while it is writing to flash.
      */
     int store();

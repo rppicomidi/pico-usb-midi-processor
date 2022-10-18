@@ -300,7 +300,7 @@ char* rppicomidi::Midi_processor_manager::serialize(uint8_t preset_num, char* pr
                 JSON_Value *midi_value = json_value_init_object();
                 JSON_Object *midi_object = json_value_get_object(midi_value);
                 for (auto& proc: midi_in_cable_processors) {
-                    proc.proc->serialize_settings(proc.proc->get_name(), midi_object);
+                    proc.proc->serialize_settings(proc.proc->get_unique_name(), midi_object);
                 }
                 std::string midi_name = std::string{"MIDI IN"}+std::to_string(idx++);
                 json_object_set_value(preset_object, midi_name.c_str(), midi_value);
@@ -310,7 +310,7 @@ char* rppicomidi::Midi_processor_manager::serialize(uint8_t preset_num, char* pr
                 JSON_Value *midi_value = json_value_init_object();
                 JSON_Object *midi_object = json_value_get_object(midi_value);
                 for (auto& proc: midi_out_cable_processors) {
-                    proc.proc->serialize_settings(proc.proc->get_name(), midi_object);
+                    proc.proc->serialize_settings(proc.proc->get_unique_name(), midi_object);
                 }
                 std::string midi_name = std::string{"MIDI OUT"}+std::to_string(idx++);
                 json_object_set_value(preset_object, midi_name.c_str(), midi_value);
@@ -428,7 +428,14 @@ bool rppicomidi::Midi_processor_manager::deserialize(char* json_format)
 
                             for (size_t proc_idx=0; result && (proc_idx < nproc_objects); proc_idx++) {
                                 const char* proc_label = json_object_get_name(proc_objects, proc_idx);
-                                size_t proc_type_idx = get_midi_processor_idx_by_name(proc_label);
+                                const size_t proc_label_len = strlen(proc_label);
+                                assert(proc_label_len > 0);
+                                char proc_type_label[proc_label_len];
+                                strcpy(proc_type_label, proc_label);
+                                char* dollar_ptr = strrchr(proc_type_label,'$');
+                                if (dollar_ptr != nullptr)
+                                    *dollar_ptr = '\0';
+                                size_t proc_type_idx = get_midi_processor_idx_by_name(proc_type_label);
                                 if (proc_type_idx >= get_num_midi_processor_types() ) {
                                     printf("deserialize: new processor name %s not found\r\n", proc_label);
                                     result = false;
@@ -440,7 +447,7 @@ bool rppicomidi::Midi_processor_manager::deserialize(char* json_format)
                                     JSON_Object* setting_objects = json_value_get_object(setting_values);
                                     result = midi_in_processors[midi_in_port][proc_idx].proc->deserialize_settings(setting_objects);
                                     if (!result) {
-                                        printf("deserialize: failed to deserialize settings for %s\r\n", proc_label);
+                                        printf("deserialize: failed to deserialize settings for %s\r\n", proc_type_label);
                                         break;
                                     }
                                 }
@@ -460,7 +467,7 @@ bool rppicomidi::Midi_processor_manager::deserialize(char* json_format)
                             JSON_Value* proc_values = json_object_get_value_at(preset, idx);
                             JSON_Object* proc_objects = json_value_get_object(proc_values);
                             size_t nproc_objects = json_object_get_count(proc_objects);
-                            printf("%u processor objects in MIDI IN%u\r\n", nproc_objects, midi_out_port+1);
+                            printf("%u processor objects in MIDI OUT%u\r\n", nproc_objects, midi_out_port+1);
 
                             mutex_enter_blocking(&processing_mutex); // Don't allow processing while messing with vectors
                             midi_out_proc_fns[midi_out_port].clear();
@@ -469,9 +476,16 @@ bool rppicomidi::Midi_processor_manager::deserialize(char* json_format)
 
                             for (size_t proc_idx=0; result && (proc_idx < nproc_objects); proc_idx++) {
                                 const char* proc_label = json_object_get_name(proc_objects, proc_idx);
-                                size_t proc_type_idx = get_midi_processor_idx_by_name(proc_label);
+                                const size_t proc_label_len = strlen(proc_label);
+                                assert(proc_label_len > 0);
+                                char proc_type_label[proc_label_len];
+                                strcpy(proc_type_label, proc_label);
+                                char* dollar_ptr = strrchr(proc_type_label,'$');
+                                if (dollar_ptr != nullptr)
+                                    *dollar_ptr = '\0';
+                                size_t proc_type_idx = get_midi_processor_idx_by_name(proc_type_label);
                                 if (proc_type_idx >= get_num_midi_processor_types() ) {
-                                    printf("deserialize: new processor name %s not found\r\n", proc_label);
+                                    printf("deserialize: new processor name %s not found\r\n", proc_type_label);
                                     result = false;
                                     break;
                                 }
@@ -481,7 +495,7 @@ bool rppicomidi::Midi_processor_manager::deserialize(char* json_format)
                                     JSON_Object* setting_objects = json_value_get_object(setting_values);
                                     result = midi_out_processors[midi_out_port][proc_idx].proc->deserialize_settings(setting_objects);
                                     if (!result) {
-                                        printf("deserialize: failed to deserialize settings for %s\r\n", proc_label);
+                                        printf("deserialize: failed to deserialize settings for %s\r\n", proc_type_label);
                                         break;
                                     }
                                 }

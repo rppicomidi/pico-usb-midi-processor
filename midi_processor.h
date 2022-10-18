@@ -38,11 +38,13 @@ class Midi_processor
 public:
     Midi_processor(const char* name_, uint16_t unique_id_) : dirty{true}, unique_id{unique_id_}
     {
-        strncpy(name,name_,max_name_length);
+        strncpy(name, name_, max_name_length);
         name[max_name_length] = '\0';
+        snprintf(unique_name, max_name_length+5,"%s$%u",name_, unique_id_);
+        name[max_name_length+5]='\0';
         if (has_feedback_process()) {
-            snprintf(feedback_name,max_name_length,"fb-%s", name_);
-            feedback_name[max_name_length] = '\0';
+            snprintf(feedback_name,max_name_length+8,"fb-%s", unique_name);
+            feedback_name[max_name_length+8] = '\0';
         }
         else {
             feedback_name[0] = '\0';
@@ -64,6 +66,8 @@ public:
      * @return const char* pointer to the process name
      */
     const char* get_name() {return name; }
+
+    const char* get_unique_name() {return unique_name; }
 
     const char* get_feedback_name() { return has_feedback_process() ? feedback_name : nullptr; }
     /**
@@ -197,8 +201,9 @@ public:
 
 protected:
     static const uint8_t max_name_length=21;
+    char unique_name[max_name_length+6];
     char name[max_name_length+1];
-    char feedback_name[max_name_length+1];
+    char feedback_name[max_name_length+9];
     bool dirty; // if true, then the settings need to be saved 
     uint16_t unique_id;
 };
