@@ -291,9 +291,7 @@ public:
     {   bool result = false;;
         if (current_preset.set(preset)) {
             result = settings_file.store();
-            if (result) {
-                dirty = false;
-            }
+            dirty = result != 0;
         }
         return result;
     }

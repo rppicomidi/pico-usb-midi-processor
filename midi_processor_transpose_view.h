@@ -28,6 +28,8 @@
 #include "int_spinner_menu_item.h"
 #include "midi_processor_settings_view.h"
 #include "midi_processor_transpose.h"
+#include "callback_menu_item.h"
+
 namespace rppicomidi
 {
 class Midi_processor_transpose_view : public Midi_processor_settings_view
@@ -38,17 +40,22 @@ public:
     Midi_processor_transpose_view(Mono_graphics& screen_, const Rectangle& rect_, Midi_processor* proc_);
     void draw() final;
 
-    void entry() final {menu.entry();}
+    void entry() final;
     void exit() final {menu.exit();}
     Select_result on_select(View** new_view) final { return menu.on_select(new_view);}
     void on_increment(uint32_t delta, bool is_shifted) final { menu.on_increment(delta, is_shifted); }
     void on_decrement(uint32_t delta, bool is_shifted) final { menu.on_decrement(delta, is_shifted); }
-
+    static void static_toggle_display_format(View* context);
     static Midi_processor_settings_view* static_make_new(Mono_graphics& screen_, const Rectangle& rect_, Midi_processor* proc_)
     {
         return new Midi_processor_transpose_view(screen_, rect_, proc_);
     }
 private:
+    void fix_display_format();
     Menu menu;
+    Mono_mono_font font;
+    Callback_menu_item* display_format_item;
+    Int_spinner_menu_item<uint8_t>* min_note;
+    Int_spinner_menu_item<uint8_t>* max_note;
 };
 }

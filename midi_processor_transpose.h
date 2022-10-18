@@ -24,6 +24,7 @@
 #include "pico/stdlib.h"
 #include "midi_processor.h"
 #include "setting_number.h"
+#include "setting_string_enum.h"
 namespace rppicomidi
 {
 class Midi_processor_transpose : public Midi_processor
@@ -31,7 +32,10 @@ class Midi_processor_transpose : public Midi_processor
 public:
     Midi_processor_transpose(uint16_t unique_id) : Midi_processor{static_getname(), unique_id},
         chan{"chan", 1, 16, 1}, min_note{"min_note", 0, 127, 0}, max_note{"max_note", 0, 127, 127},
-        transpose_delta("transpose_delta", -12, 12, 0)
+        transpose_delta("transpose_delta", -12, 12, 0),
+        format_decimal{"Display Decimal"}, format_hex{"Display Hex"},
+        display_format{"Display Format", {format_decimal, format_hex}}
+
     {
         load_defaults();
     }
@@ -105,6 +109,10 @@ public:
     bool deserialize_settings(JSON_Object *root_object) final;
     void load_defaults() final;
 
+    bool set_display_format(size_t idx) { dirty = true; return display_format.set(idx); }
+    void get_display_format(std::string &typestr) { display_format.get(typestr); }
+    size_t get_display_format() {return display_format.get_ivalue(); }
+
     // The following are manditory static methods to enable the Midi_processor_manager class
     static const char* static_getname() { return "Transpose"; }
     static Midi_processor* static_make_new(uint16_t unique_id_) {return new Midi_processor_transpose(unique_id_); }
@@ -113,5 +121,8 @@ protected:
     Setting_number<uint8_t> min_note;       //!< Minimum note number to transpose 0-127
     Setting_number<uint8_t> max_note;       //!< Maximum note number to transpose min_note-127
     Setting_number<int8_t> transpose_delta; //!< Number of half-steps to add to the note number -12 to 12
+    const std::string format_decimal;
+    const std::string format_hex;
+    Setting_string_enum display_format;     //!< Decimal or hex
 };
 }

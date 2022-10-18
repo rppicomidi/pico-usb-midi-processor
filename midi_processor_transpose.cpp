@@ -49,6 +49,7 @@ void rppicomidi::Midi_processor_transpose::serialize_settings(const char* name, 
     JSON_Value *proc_value = json_value_init_object();
     JSON_Object *proc_object = json_value_get_object(proc_value);
     chan.serialize(proc_object);
+    display_format.serialize(proc_object);
     min_note.serialize(proc_object);
     max_note.serialize(proc_object);
     transpose_delta.serialize(proc_object);
@@ -61,6 +62,9 @@ bool rppicomidi::Midi_processor_transpose::deserialize_settings(JSON_Object *roo
     bool result = false;
     if (chan.deserialize(root_object))
         result = true;
+
+    if (!result || !display_format.deserialize(root_object))
+        result = false;
 
     if (!result || !min_note.deserialize(root_object))
         result = false;
