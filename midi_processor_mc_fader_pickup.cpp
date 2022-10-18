@@ -136,7 +136,7 @@ bool rppicomidi::Mc_fader_pickup::set_hw_fader_value(uint16_t hw_fader_value)
 
 bool rppicomidi::Midi_processor_mc_fader_pickup::process(uint8_t* packet)
 {
-    bool do_not_filter_out = false;
+    bool do_not_filter_out = true; // only filter out pitch bend messages if required
     if (packet[1]>= 0xE0 && packet[1] <= 0xE8) {
         // fader pitch bend message (the channel number determines the fader number)
         auto& fader  = faders[Midi_processor::get_channel_num(packet) - 1];
@@ -147,10 +147,13 @@ bool rppicomidi::Midi_processor_mc_fader_pickup::process(uint8_t* packet)
 
 bool rppicomidi::Midi_processor_mc_fader_pickup::feedback(uint8_t* packet)
 {
+     // passing the message along after processing does no harm;
+     // if you are using this, your device probably ignores this packet
+    bool do_not_filter_out = true;
     if (packet[1]>= 0xE0 && packet[1] <= 0xE8) {
         // fader pitch bend message
         auto& fader  = faders[Midi_processor::get_channel_num(packet) - 1];
         fader.set_daw_fader_value(fader.extract_fader_value(packet));
     }
-    return false; // always filter this message out; it does nothing for non-motorized faders
+    return do_not_filter_out;
 }
