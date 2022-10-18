@@ -128,6 +128,7 @@ void rppicomidi::Midi_processor_manager::delete_midi_processor_by_idx(int idx, u
 
 void rppicomidi::Midi_processor_manager::clear_all_processors()
 {
+    mutex_enter_blocking(&processing_mutex); // Don't allow processing while messing with vectors
     // erase all data structures associated with the processor lists
     for (size_t cable=0; cable < midi_in_processors.size(); cable++) {
         midi_in_proc_fns[cable].clear();
@@ -146,6 +147,8 @@ void rppicomidi::Midi_processor_manager::clear_all_processors()
         midi_out_processors[cable].clear();
     }
     processors_with_tasks.clear();
+    mutex_exit(&processing_mutex);
+
 }
 
 void rppicomidi::Midi_processor_manager::build_processor_structures()
@@ -401,10 +404,13 @@ bool rppicomidi::Midi_processor_manager::deserialize(char* json_format)
             JSON_Object* preset = json_object_get_object(root_object, std::to_string(last_preset).c_str());
             size_t nobjects = json_object_get_count(preset);
             const size_t nmidi_in = midi_in_processors.size(); 
-            const size_t nmidi_out = midi_out_processors.size(); 
+            const size_t nmidi_out = midi_out_processors.size();
             // There should be as many objects as there are MIDI INs and MIDI OUTs
             if (nobjects == (nmidi_in + nmidi_out)) {
                 printf("deserialize: got %u objects as expected\r\n", nobjects);
+                // clear out the existing data
+                clear_all_processors();
+                // deserialize all processors to all cables in both directions
                 for (size_t idx=0; result && idx < nobjects; idx++) {
                     const char* label = json_object_get_name(preset, idx);
                     if (label == nullptr || strlen(label) < 8) {
@@ -420,11 +426,6 @@ bool rppicomidi::Midi_processor_manager::deserialize(char* json_format)
                             JSON_Object* proc_objects = json_value_get_object(proc_values);
                             size_t nproc_objects = json_object_get_count(proc_objects);
                             printf("%u processor objects in MIDI IN%u\r\n", nproc_objects, midi_in_port+1);
-
-                            mutex_enter_blocking(&processing_mutex); // Don't allow processing while messing with vectors
-                            midi_in_proc_fns[midi_in_port].clear();
-                            midi_in_processors[midi_in_port].clear();
-                            mutex_exit(&processing_mutex);
 
                             for (size_t proc_idx=0; result && (proc_idx < nproc_objects); proc_idx++) {
                                 const char* proc_label = json_object_get_name(proc_objects, proc_idx);
@@ -468,11 +469,6 @@ bool rppicomidi::Midi_processor_manager::deserialize(char* json_format)
                             JSON_Object* proc_objects = json_value_get_object(proc_values);
                             size_t nproc_objects = json_object_get_count(proc_objects);
                             printf("%u processor objects in MIDI OUT%u\r\n", nproc_objects, midi_out_port+1);
-
-                            mutex_enter_blocking(&processing_mutex); // Don't allow processing while messing with vectors
-                            midi_out_proc_fns[midi_out_port].clear();
-                            midi_out_processors[midi_out_port].clear();
-                            mutex_exit(&processing_mutex);
 
                             for (size_t proc_idx=0; result && (proc_idx < nproc_objects); proc_idx++) {
                                 const char* proc_label = json_object_get_name(proc_objects, proc_idx);
