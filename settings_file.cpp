@@ -22,7 +22,6 @@
  */
 #include <assert.h>
 #include "settings_file.h"
-#include "littlefs-lib/pico_hal.h"
 #include "midi_processor_manager.h"
 rppicomidi::Settings_file::Settings_file() : vid{0}, pid{0}
 {
@@ -40,14 +39,35 @@ rppicomidi::Settings_file::Settings_file() : vid{0}, pid{0}
         }
     }
     printf("successfully mounted flash file system\r\n");
-    struct pico_fsstat_t stat;
-    if (pico_fsstat(&stat) == 0) {
-        printf("FS: blocks %d, block size %d, used %d\n", (int)stat.block_count, (int)stat.block_size,
-                (int)stat.blocks_used);
-    }
+
     if (pico_unmount() != 0) {
         printf("Failed to unmount the flash file system\r\n");
     }
+}
+
+void rppicomidi::Settings_file::add_all_cli_commands(EmbeddedCli *cli)
+{
+    embeddedCliAddBinding(cli, {
+        "fsstat",
+        "display settings file system status",
+        false,
+        this,
+        static_file_system_status
+    });
+    embeddedCliAddBinding(cli, {
+        "ls",
+        "list all settings files",
+        false,
+        this,
+        static_list_files
+    });
+    embeddedCliAddBinding(cli, {
+        "cat",
+        "print file contents\r\n\t\tusage: cat <fn>",
+        true,
+        this,
+        static_print_file
+    });
 }
 
 void rppicomidi::Settings_file::set_vid_pid(uint16_t vid_, uint16_t pid_)
@@ -56,53 +76,57 @@ void rppicomidi::Settings_file::set_vid_pid(uint16_t vid_, uint16_t pid_)
     pid = pid_;
 }
 
+int rppicomidi::Settings_file::load_settings_string(const char* settings_filename, char** raw_settings_ptr)
+{
+    int error_code = pico_mount(false);
+    if (error_code != 0) {
+        printf("unexpected error %d mounting flash\r\n", error_code);
+        return error_code;
+    }
+    int file = pico_open(settings_filename, LFS_O_RDONLY);
+    if (file < 0) {
+        // file isn't there
+        pico_unmount();
+        return file; // the error code
+    }
+    else {
+        // file is open. Read the whole contents to a string
+        auto flen = pico_size(file);
+        if (flen < 0) {
+            // Something went wrong
+            pico_unmount();
+            return flen;
+        }
+        // create a string long enough
+        *raw_settings_ptr = new char[flen+1];
+        if (!raw_settings_ptr) {
+            pico_close(file);
+            pico_unmount();
+            return LFS_ERR_NOMEM; // new failed
+        }
+        auto nread = pico_read(file, *raw_settings_ptr, flen);
+        pico_close(file);
+        pico_unmount();
+        if (nread == (lfs_size_t)flen) {
+            // Success!
+            (*raw_settings_ptr)[flen]='\0'; // just in case, add null termination
+            return LFS_ERR_OK;
+        }
+        if (nread > 0) {
+            delete[] *raw_settings_ptr;
+            *raw_settings_ptr = nullptr;
+            nread = LFS_ERR_IO;
+        }
+        return nread;
+    }
+}
 
 int rppicomidi::Settings_file::load_settings_string(char** raw_settings_ptr)
 {
     if (vid != 0 && pid != 0) {
-        int error_code = pico_mount(false);
-        if (error_code != 0) {
-            printf("unexpected error %d mounting flash\r\n", error_code);
-            return false;
-        }
         char settings_filename[]="0000-0000.json";
         get_filename(settings_filename);
-        int file = pico_open(settings_filename, LFS_O_RDONLY);
-        if (file < 0) {
-            // file isn't there
-            pico_unmount();
-            return file; // the error code
-        }
-        else {
-            // file is open. Read the whole contents to a string
-            auto flen = pico_size(file);
-            if (flen < 0) {
-                // Something went wrong
-                pico_unmount();
-                return flen;
-            }
-            // create a string long enough
-            *raw_settings_ptr = new char[flen+1];
-            if (!raw_settings_ptr) {
-                pico_close(file);
-                pico_unmount();
-                return LFS_ERR_NOMEM; // new failed
-            }
-            auto nread = pico_read(file, *raw_settings_ptr, flen);
-            pico_close(file);
-            pico_unmount();
-            if (nread == (lfs_size_t)flen) {
-                // Success!
-                (*raw_settings_ptr)[flen]='\0'; // just in case, add null termination
-                return LFS_ERR_OK;
-            }
-            if (nread > 0) {
-                delete[] *raw_settings_ptr;
-                *raw_settings_ptr = nullptr;
-                nread = LFS_ERR_IO;
-            }
-            return nread;
-        }
+        return load_settings_string(settings_filename, raw_settings_ptr);
     }
     return LFS_ERR_INVAL; // vid and pid are not valid yet
 }
@@ -113,7 +137,7 @@ bool rppicomidi::Settings_file::load()
     auto error_code = load_settings_string(&raw_settings);
     bool result = false;
     if (error_code == LFS_ERR_OK) {
-        printf("load (%04x-%04x): %s\r\n", vid, pid, raw_settings);
+        //printf("load (%04x-%04x):\r\n", vid, pid);
         result = Midi_processor_manager::instance().deserialize(raw_settings);
     }
     else {
@@ -122,7 +146,7 @@ bool rppicomidi::Settings_file::load()
             printf("Failed to allocate previous raw settings\r\n");
         }
         else {
-            printf("loading defaults: %s\r\n", default_raw_settings);
+            printf("loading defaults:\r\n");
             result = Midi_processor_manager::instance().deserialize(default_raw_settings);
             json_free_serialized_string(default_raw_settings);
         }        
@@ -140,7 +164,7 @@ bool rppicomidi::Settings_file::load_preset(uint8_t next_preset)
     auto error_code = load_settings_string(&raw_settings);
     bool result = false;
     if (error_code == LFS_ERR_OK) {
-        printf("load (%04x-%04x): %s\r\n", vid, pid, raw_settings);
+        printf("load (%04x-%04x):\r\n", vid, pid);
         result = Midi_processor_manager::instance().deserialize_preset(next_preset, raw_settings);
     }
     else {
@@ -149,7 +173,7 @@ bool rppicomidi::Settings_file::load_preset(uint8_t next_preset)
             printf("Failed to allocate previous raw settings\r\n");
         }
         else {
-            printf("loading defaults: %s\r\n", default_raw_settings);
+            printf("loading defaults:\r\n");
             result = Midi_processor_manager::instance().deserialize_preset(next_preset, default_raw_settings);
             json_free_serialized_string(default_raw_settings);
         }        
@@ -177,7 +201,7 @@ int rppicomidi::Settings_file::store()
     // Serialize to a string for storage
     char* settings_str = Midi_processor_manager::instance().serialize(Midi_processor_manager::instance().get_current_preset(), previous_raw_settings);
     if (settings_str) {
-        printf("store (%04x-%04x): %s\r\n",vid,pid, settings_str);
+        printf("store (%04x-%04x):\r\n",vid,pid);
     }
     else {
         return LFS_ERR_NOMEM;
@@ -263,4 +287,110 @@ int rppicomidi::Settings_file::store()
         return LFS_ERR_IO;
     }
     return LFS_ERR_OK;
+}
+
+
+int rppicomidi::Settings_file::lfs_ls(const char *path)
+{
+    lfs_dir_t dir;
+    int err = lfs_dir_open(&dir, path);
+    if (err) {
+        return err;
+    }
+
+    struct lfs_info info;
+    while (true) {
+        int res = lfs_dir_read(&dir, &info);
+        if (res < 0) {
+            return res;
+        }
+
+        if (res == 0) {
+            break;
+        }
+
+        switch (info.type) {
+            case LFS_TYPE_REG: printf("reg "); break;
+            case LFS_TYPE_DIR: printf("dir "); break;
+            default:           printf("?   "); break;
+        }
+
+        static const char *prefixes[] = {"", "K", "M", "G"};
+        for (int i = sizeof(prefixes)/sizeof(prefixes[0])-1; i >= 0; i--) {
+            if (info.size >= static_cast<size_t>((1 << 10*i)-1)) {
+                printf("%*lu%sB ", 4-(i != 0), info.size >> 10*i, prefixes[i]);
+                break;
+            }
+        }
+
+        printf("%s\n", info.name);
+    }
+
+    err = lfs_dir_close(&dir);
+    if (err) {
+        return err;
+    }
+
+    return 0;
+}
+
+void rppicomidi::Settings_file::static_file_system_status(EmbeddedCli*, char*, void*)
+{
+    int error_code = pico_mount(false);
+    if (error_code != LFS_ERR_OK) {
+        printf("can't mount settings file system\r\n");
+        return;
+    }
+    struct pico_fsstat_t stat;
+    if (pico_fsstat(&stat) == LFS_ERR_OK) {
+        printf("FS: blocks %d, block size %d, used %d\n", (int)stat.block_count, (int)stat.block_size,
+                (int)stat.blocks_used);
+    }
+    else {
+        printf("could not read file system status\r\n");
+    }
+    error_code = pico_unmount();
+    if (error_code != LFS_ERR_OK) {
+        printf("can't unmount settings file system\r\n");
+        return;
+    }
+}
+
+
+void rppicomidi::Settings_file::static_list_files(EmbeddedCli* cli, char* args, void* context)
+{
+    (void)cli;
+    (void)args;
+    auto me = reinterpret_cast<Settings_file*>(context);
+    int error_code = pico_mount(false);
+    if (error_code != LFS_ERR_OK) {
+        printf("can't mount settings file system\r\n");
+        return;
+    }
+    error_code = me->lfs_ls("/");
+    if (error_code != LFS_ERR_OK) {
+        printf("error listing path \"/\"\r\n");
+    }
+    error_code = pico_unmount();
+    if (error_code != LFS_ERR_OK) {
+        printf("can't unmount settings file system\r\n");
+        return;
+    }
+}
+
+void rppicomidi::Settings_file::static_print_file(EmbeddedCli* cli, char* args, void* context)
+{
+    (void)cli;
+    auto me = reinterpret_cast<Settings_file*>(context);
+    if (embeddedCliGetTokenCount(args) != 1) {
+        printf("usage: cat <filename>");
+        return;
+    }
+    const char* fn=embeddedCliGetToken(args, 1);
+    char* raw_settings;
+    int error_code = me->load_settings_string(fn, &raw_settings);
+    if (error_code == LFS_ERR_OK) {
+        printf("File: %s\r\n%s\r\n", fn, raw_settings);
+        delete[] raw_settings;
+    }
 }

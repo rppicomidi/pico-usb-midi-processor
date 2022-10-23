@@ -42,6 +42,7 @@
 #include "view.h"
 #include "settings_file.h"
 #include "setting_number.h"
+#include "embedded_cli.h"
 namespace rppicomidi
 {
 class Midi_processor_manager
@@ -81,6 +82,7 @@ public:
      */
     Midi_processor_manager();
 
+    void add_all_cli_commands(EmbeddedCli *cli);
     /**
      * @brief Get the number of MIDI Processor types
      * 

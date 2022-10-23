@@ -139,9 +139,13 @@ from various GitHub projects.
 implement the USB communications; the fork was required to add
 USB MIDI Host functionality
 - the parson project to implement JSON format settings storage
-- a fork of the pico-littlefs project to implement a file system
-on the Pico program flash; the fork is required to handle writing
-to flash whilst both RP2040 cores are active
+- a fork of the pico-littlefs project to implement the littlefs
+flash file system with journal and wear leveling on the Pico
+program flash; the fork is required to handle writing to flash
+whilst both RP2040 cores are active
+- the embedded-cli project to implement a debug command line
+interpreter; type help on the serial port console for a list of 
+commands.
 - some modified font files from various projects for the OLEDs
 
 Some original library code includes

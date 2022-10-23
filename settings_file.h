@@ -33,6 +33,8 @@
 #pragma once
 #include <cstdint>
 #include <string>
+#include "littlefs-lib/pico_hal.h"
+#include "embedded_cli.h"
 
 namespace rppicomidi {
 /**
@@ -60,6 +62,8 @@ template <typename I> void n2hexstr(I w, char* hex_cstr, size_t max_cstr) {
 class Settings_file {
 public:
     Settings_file();
+
+    void add_all_cli_commands(EmbeddedCli *cli);
     /**
      * @brief Set the vid and pid values (used to form the JSON key
      * for serializing this object). This will trigger loading
@@ -99,6 +103,19 @@ private:
      */
     int load_settings_string(char** raw_settings_ptr);
 
+    int load_settings_string(const char* fn, char** raw_settings_ptr);
+    /**
+     * @brief See https://github.com/littlefs-project/littlefs/issues/2
+     * 
+     * @param lfs pointer to lfs object
+     * @param path root path string
+     * @return int 0 if no error, < 0 if there is an error
+     */
+    int lfs_ls(const char *path);
+
+    static void static_file_system_status(EmbeddedCli*, char*, void*);
+    static void static_list_files(EmbeddedCli* cli, char* args, void* context);
+    static void static_print_file(EmbeddedCli* cli, char* args, void* context);
     /**
      * @brief set buffer pointed to by fn to a null terminated
      * C-style character string VVVV-PPPP, where

@@ -44,6 +44,11 @@ rppicomidi::Midi_processor_manager::Midi_processor_manager() : screen{nullptr}, 
                         Midi_processor_chan_mes_remap_settings_view::static_make_new});
 }
 
+void rppicomidi::Midi_processor_manager::add_all_cli_commands(EmbeddedCli *cli)
+{
+    settings_file.add_all_cli_commands(cli);
+}
+
 void rppicomidi::Midi_processor_manager::set_connected_device(uint16_t vid_, uint16_t pid_, uint8_t num_in_cables_, uint8_t num_out_cables_)
 {
     // create data structures for managing processors for MIDI IN and MIDI OUT

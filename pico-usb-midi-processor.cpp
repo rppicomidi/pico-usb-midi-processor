@@ -47,6 +47,7 @@
 #include "nav_buttons.h"
 #include "midi_processor.h"
 #include "midi_processor_manager.h"
+#include "embedded_cli.h"
 
 namespace rppicomidi {
 class Pico_usb_midi_processor {
@@ -68,6 +69,7 @@ public:
     void operator=(Pico_usb_midi_processor const&) = delete;
 
     Pico_usb_midi_processor();
+    void add_all_cli_commands(EmbeddedCli *cli);
     void task();
     void clone_complete_cb();
     void poll_midi_dev_rx();
@@ -149,6 +151,11 @@ rppicomidi::Pico_usb_midi_processor::Pico_usb_midi_processor()  : addr{OLED_ADDR
         }
     }
     assert(success);
+}
+
+void rppicomidi::Pico_usb_midi_processor::add_all_cli_commands(EmbeddedCli *cli)
+{
+    Midi_processor_manager::instance().add_all_cli_commands(cli);
 }
 
 void rppicomidi::Pico_usb_midi_processor::poll_midi_dev_rx()
@@ -277,6 +284,28 @@ void rppicomidi::Pico_usb_midi_processor::clone_complete_cb()
     midi_device_status = MIDI_DEVICE_NEEDS_INIT;
 }
 
+static void onCommand(const char* name, char *tokens)
+{
+    printf("Received command: %s\r\n",name);
+
+    for (int i = 0; i < embeddedCliGetTokenCount(tokens); ++i) {
+        printf("Arg %d : %s\r\n", i, embeddedCliGetToken(tokens, i + 1));
+    }
+}
+
+static void onCommandFn(EmbeddedCli *embeddedCli, CliCommand *command)
+{
+    (void)embeddedCli;
+    embeddedCliTokenizeArgs(command->args);
+    onCommand(command->name == NULL ? "" : command->name, command->args);
+}
+
+static void writeCharFn(EmbeddedCli *embeddedCli, char c)
+{
+    (void)embeddedCli;
+    putchar(c);
+}
+
 // core0: handle device events
 int main()
 {
@@ -292,12 +321,26 @@ int main()
     multicore_reset_core1();    
     multicore_launch_core1(core1_main);
 
-    // initialize the Pico_usb_midi_processor object instance
+    // Initialize the CLI
+    EmbeddedCli *cli = embeddedCliNewDefault();
+    cli->onCommand = onCommandFn;
+    cli->writeChar = writeCharFn;
+    // initialize the Pico_usb_midi_processor object instance and the associated CLI
     auto instance_ptr=&rppicomidi::Pico_usb_midi_processor::instance();
 
+    instance_ptr->add_all_cli_commands(cli);
     TU_LOG1("pico-usb-midi-processor\r\n");
+    while(getchar_timeout_us(0) != PICO_ERROR_TIMEOUT) {
+        // flush out the console input buffer
+    }
     while (1) {
         instance_ptr->task();
+        // update the CLI if need be
+        int c = getchar_timeout_us(0);
+        if (c != PICO_ERROR_TIMEOUT) {
+            embeddedCliReceiveChar(cli, c);
+            embeddedCliProcess(cli);
+        }
     }
 
     return 0;
