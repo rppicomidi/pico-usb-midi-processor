@@ -94,6 +94,23 @@ public:
      * @note this function will disable interrupts while it is writing to flash.
      */
     int store();
+
+    /**
+     * @brief set buffer pointed to by fn to a null terminated
+     * C-style character string VVVV-PPPP, where
+     * VVVV is the connected device's idVendor and PPPP is the
+     * connected device's idProduct
+     *
+     * @param fn points to a character buffer that will be set
+     * to the null terminated VVVV-PPPP C-style character string.
+     * The fn buffer must be at least 10 bytes long or memory
+     * corruption will result.
+     */
+    void get_filename(char* fn) {
+        n2hexstr<uint16_t>(vid, fn, 4);
+        n2hexstr<uint16_t>(pid, fn+5, 4);
+        fn[4] = '-';
+    }
 private:
     /**
      * @brief get the JSON serialized string from the file named settings_filename
@@ -118,22 +135,6 @@ private:
     static void static_list_files(EmbeddedCli* cli, char* args, void* context);
     static void static_print_file(EmbeddedCli* cli, char* args, void* context);
     static void static_delete_file(EmbeddedCli* cli, char* args, void*);
-    /**
-     * @brief set buffer pointed to by fn to a null terminated
-     * C-style character string VVVV-PPPP, where
-     * VVVV is the connected device's idVendor and PPPP is the
-     * connected device's idProduct
-     *
-     * @param fn points to a character buffer that will be set
-     * to the null terminated VVVV-PPPP C-style character string.
-     * The fn buffer must be at least 10 bytes long or memory
-     * corruption will result.
-     */
-    void get_filename(char* fn) {
-        n2hexstr<uint16_t>(vid, fn, 4);
-        n2hexstr<uint16_t>(pid, fn+5, 4);
-        fn[4] = '-';
-    }
 
     uint16_t vid;       // the idVendor of the connected device (not serialized here)
     uint16_t pid;       // the idProduct of the connected device (not serialized here)

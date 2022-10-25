@@ -194,7 +194,7 @@ void rppicomidi::Pico_usb_midi_processor::task()
             uint8_t num_in_cables = tuh_midi_get_num_tx_cables(midi_dev_addr);
             uint8_t num_out_cables = tuh_midi_get_num_rx_cables(midi_dev_addr);
             home_screen.set_connected_device(prod, num_in_cables, num_out_cables);
-            Midi_processor_manager::instance().set_connected_device(get_vid(), get_pid(), num_in_cables, num_out_cables);
+            Midi_processor_manager::instance().set_connected_device(get_vid(), get_pid(), prod, num_in_cables, num_out_cables);
             home_screen.draw();
         }
         tud_init(0);

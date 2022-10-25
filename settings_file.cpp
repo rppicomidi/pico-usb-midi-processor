@@ -260,16 +260,6 @@ int rppicomidi::Settings_file::store()
             pico_unmount();
             return file;
         }
-#if 0
-        error_code = pico_truncate(file, 0);
-        if (error_code != LFS_ERR_OK) {
-            printf("error %s truncating exiting settings file %s\r\n", pico_errmsg(error_code), settings_filename);
-            free((void*)settings_str);
-            pico_close(file);
-            pico_unmount();
-            return error_code;
-        }
-#endif
     }
     printf("writing settings to file %s\r\n", settings_filename);
     // file is open for writing; write the settings

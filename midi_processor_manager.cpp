@@ -42,6 +42,8 @@ rppicomidi::Midi_processor_manager::Midi_processor_manager() : screen{nullptr}, 
                         Midi_processor_chan_mes_remap_settings_view::static_make_new});
     proclist.push_back({Midi_processor_chan_button_remap::static_getname(), Midi_processor_chan_button_remap::static_make_new,
                         Midi_processor_chan_mes_remap_settings_view::static_make_new});
+    *id_str = '\0';
+    *prod_str = '\0';
 }
 
 void rppicomidi::Midi_processor_manager::add_all_cli_commands(EmbeddedCli *cli)
@@ -49,7 +51,7 @@ void rppicomidi::Midi_processor_manager::add_all_cli_commands(EmbeddedCli *cli)
     settings_file.add_all_cli_commands(cli);
 }
 
-void rppicomidi::Midi_processor_manager::set_connected_device(uint16_t vid_, uint16_t pid_, uint8_t num_in_cables_, uint8_t num_out_cables_)
+void rppicomidi::Midi_processor_manager::set_connected_device(uint16_t vid_, uint16_t pid_, const char* prod_str_, uint8_t num_in_cables_, uint8_t num_out_cables_)
 {
     // create data structures for managing processors for MIDI IN and MIDI OUT
     for (int cable = 0; cable < num_in_cables_; cable++) {
@@ -65,6 +67,9 @@ void rppicomidi::Midi_processor_manager::set_connected_device(uint16_t vid_, uin
     if (!settings_file.load()) {
         printf("error loading settings for device %04x-%04x\r\n", vid_, pid_);
     }
+    strncpy(prod_str, prod_str_, MAX_PROD_STR_NAME);
+    settings_file.get_filename(id_str);
+    prod_str[MAX_PROD_STR_NAME] = '\0';
 }
 
 
@@ -285,6 +290,7 @@ char* rppicomidi::Midi_processor_manager::serialize(uint8_t preset_num, char* pr
     if (root_value && json_value_get_type(root_value) == JSONObject) {
         mutex_enter_blocking(&processing_mutex); // Don't allow processing or changes while serializing
         JSON_Object* root_object = json_value_get_object(root_value);
+
         current_preset.set(preset_num);
         JSON_Value* preset_value = json_object_get_value(root_object, std::to_string(current_preset.get()).c_str());
         if (preset_value == nullptr) {
@@ -337,6 +343,10 @@ char* rppicomidi::Midi_processor_manager::serialize_default()
 {
     JSON_Value *root_value = json_value_init_object();
     JSON_Object *root_object = json_value_get_object(root_value);
+    json_object_set_string(root_object, "id", id_str);
+    json_object_set_string(root_object, "prod", prod_str);
+
+
     current_preset.serialize(root_object);
     for (uint8_t preset_num = current_preset.get_min(); preset_num <= current_preset.get_max(); preset_num++) {
         int idx = 1;

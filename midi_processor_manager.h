@@ -43,6 +43,7 @@
 #include "settings_file.h"
 #include "setting_number.h"
 #include "embedded_cli.h"
+#define MAX_PROD_STR_NAME 42
 namespace rppicomidi
 {
 class Midi_processor_manager
@@ -181,10 +182,11 @@ public:
      * 
      * @param vid_ the idVendor of the newly connected MIDI device
      * @param pid_ the idProduct of the newly connected MIDI device
+     * @param prod_str the product string
      * @param num_in_cables_ the number of virtual MIDI IN cables
      * @param num_out_cables_ the number of virtual MIDI OUT cables
      */
-    void set_connected_device(uint16_t vid_, uint16_t pid_, uint8_t num_in_cables_, uint8_t num_out_cables_);
+    void set_connected_device(uint16_t vid_, uint16_t pid_, const char* prod_str_, uint8_t num_in_cables_, uint8_t num_out_cables_);
 
     /**
      * @brief process the MIDI IN packet from the connected device on the specified virtual cable 
@@ -329,5 +331,7 @@ private:
     Settings_file settings_file;
     Setting_number<uint8_t> current_preset;
     bool dirty;
+    char id_str[10];
+    char prod_str[MAX_PROD_STR_NAME+1];
 };
 }
