@@ -113,9 +113,11 @@ private:
      */
     int lfs_ls(const char *path);
 
+    static void static_file_system_format(EmbeddedCli*, char*, void*);
     static void static_file_system_status(EmbeddedCli*, char*, void*);
     static void static_list_files(EmbeddedCli* cli, char* args, void* context);
     static void static_print_file(EmbeddedCli* cli, char* args, void* context);
+    static void static_delete_file(EmbeddedCli* cli, char* args, void*);
     /**
      * @brief set buffer pointed to by fn to a null terminated
      * C-style character string VVVV-PPPP, where

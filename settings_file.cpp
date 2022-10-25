@@ -48,6 +48,13 @@ rppicomidi::Settings_file::Settings_file() : vid{0}, pid{0}
 void rppicomidi::Settings_file::add_all_cli_commands(EmbeddedCli *cli)
 {
     embeddedCliAddBinding(cli, {
+        "format",
+        "format settings file system",
+        false,
+        this,
+        static_file_system_format
+    });
+    embeddedCliAddBinding(cli, {
         "fsstat",
         "display settings file system status",
         false,
@@ -63,10 +70,17 @@ void rppicomidi::Settings_file::add_all_cli_commands(EmbeddedCli *cli)
     });
     embeddedCliAddBinding(cli, {
         "cat",
-        "print file contents\r\n\t\tusage: cat <fn>",
+        "print file contents. usage: cat <fn>",
         true,
         this,
         static_print_file
+    });
+    embeddedCliAddBinding(cli, {
+        "rm",
+        "delete. usage: rm <fn>",
+        true,
+        this,
+        static_delete_file
     });
 }
 
@@ -334,6 +348,25 @@ int rppicomidi::Settings_file::lfs_ls(const char *path)
     return 0;
 }
 
+void rppicomidi::Settings_file::static_file_system_format(EmbeddedCli*, char*, void*)
+{
+    printf("formatting settings file system then mounting it\r\n");
+    int error_code = pico_mount(true);
+    if (error_code != LFS_ERR_OK) {
+
+    }
+    else {
+        error_code = pico_unmount();
+        if (error_code != LFS_ERR_OK) {
+            printf("unexpected error %d unmounting settings file system\r\n", error_code);
+        }
+        else {
+            printf("File system successfully formated and unmounted\r\n");
+        }
+    }
+
+}
+
 void rppicomidi::Settings_file::static_file_system_status(EmbeddedCli*, char*, void*)
 {
     int error_code = pico_mount(false);
@@ -392,5 +425,61 @@ void rppicomidi::Settings_file::static_print_file(EmbeddedCli* cli, char* args, 
     if (error_code == LFS_ERR_OK) {
         printf("File: %s\r\n%s\r\n", fn, raw_settings);
         delete[] raw_settings;
+    }
+    else {
+        switch(error_code) {
+        case LFS_ERR_NOENT:
+            printf("File %s does not exist\r\n", fn);
+            break;
+        case LFS_ERR_ISDIR:
+            printf("%s is a directory\r\n",fn);
+            break;
+        case LFS_ERR_CORRUPT:
+            printf("%s is corrupt\r\n",fn);
+            break;
+        case LFS_ERR_IO:
+            printf("IO Error reading %s\r\n", fn);
+            break;
+        default:
+            printf("Unexpected Error %d reading %s\r\n", error_code, fn);
+            break;
+        }
+    }
+}
+
+void rppicomidi::Settings_file::static_delete_file(EmbeddedCli* cli, char* args, void*)
+{
+    (void)cli;
+    if (embeddedCliGetTokenCount(args) != 1) {
+        printf("usage: rm <filename>");
+        return;
+    }
+    const char* fn=embeddedCliGetToken(args, 1);
+    int error_code = pico_mount(false);
+    if (error_code == LFS_ERR_OK) {
+        error_code = pico_remove(fn);
+        if (error_code != LFS_ERR_OK) {
+            switch(error_code) {
+            case LFS_ERR_NOENT:
+                printf("File %s does not exist\r\n", fn);
+                break;
+            case LFS_ERR_ISDIR:
+                printf("%s is a directory\r\n",fn);
+                break;
+            case LFS_ERR_CORRUPT:
+                printf("%s is corrupt\r\n",fn);
+                break;
+            case LFS_ERR_IO:
+                printf("IO Error deleting %s\r\n", fn);
+                break;
+            default:
+                printf("Unexpected Error %d deleting %s\r\n", error_code, fn);
+                break;
+            }
+        }
+        error_code = pico_unmount();
+        if (error_code != LFS_ERR_OK) {
+            printf("Unexpected Error %d unmounting settings file system\r\n", error_code);
+        }
     }
 }
