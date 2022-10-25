@@ -28,10 +28,10 @@ rppicomidi::Settings_file::Settings_file() : vid{0}, pid{0}
     // Make sure the flash filesystem is working
     int error_code = pico_mount(false);
     if (error_code != 0) {
-        printf("Error %d mounting the flash file system\r\nFormatting...",error_code);
+        printf("Error %s mounting the flash file system\r\nFormatting...", pico_errmsg(error_code));
         error_code = pico_mount(true);
         if (error_code != 0) {
-            printf("Error %d mounting the flash file system\r\nFormatting...",error_code);
+            printf("Error %s mounting the flash file system\r\nFormatting...", pico_errmsg(error_code));
             exit(-1);
         }
         else {
@@ -94,7 +94,7 @@ int rppicomidi::Settings_file::load_settings_string(const char* settings_filenam
 {
     int error_code = pico_mount(false);
     if (error_code != 0) {
-        printf("unexpected error %d mounting flash\r\n", error_code);
+        printf("unexpected error %s mounting flash\r\n", pico_errmsg(error_code));
         return error_code;
     }
     int file = pico_open(settings_filename, LFS_O_RDONLY);
@@ -235,56 +235,43 @@ int rppicomidi::Settings_file::store()
     if (file < 0) {
         // file does not exist
         printf("opening/creating file %s for read/write\r\n", settings_filename);
-        file = pico_open(settings_filename, LFS_O_RDWR | LFS_O_CREAT);
+        file = pico_open(settings_filename, LFS_O_WRONLY | LFS_O_CREAT);
         if (file < 0) {
-            printf("could not open settings.json for writing\r\n");
+            printf("error %s creating %s for writing\r\n", pico_errmsg(file), settings_filename);
             free((void*)settings_str);
             pico_unmount();
             return file;
         }
     }
     else {
-        // file exists. Copy it to a backup
-        pico_close(file);
-        char backup_filename[]="0000-0000.bu";
-        get_filename(backup_filename);
-        printf("renaming file %s to file %s\r\n", settings_filename, backup_filename);
-        error_code = pico_rename(settings_filename, backup_filename);
-        if (error_code == LFS_ERR_EXIST) {
-            printf("backup file %s exists. Deleting it first\r\n", backup_filename);
-            if (pico_remove(backup_filename) == LFS_ERR_OK) {
-                error_code = pico_rename(settings_filename, backup_filename);
-                if (error_code != LFS_ERR_OK) {
-                    printf("error %s renaming file %s to file %s\r\n", pico_errmsg(error_code), settings_filename, backup_filename);
-                    free((void*)settings_str);
-                    // something went wrong
-                    pico_unmount();
-                    return error_code;
-                }
-            }
-            else {
-                printf("error moving %s to s%s\r\n",settings_filename, backup_filename);
-                free((void*)settings_str);
-                pico_unmount();
-                return error_code;
-            }
-        }
-        else if (error_code != LFS_ERR_OK) {
-            printf("error moving %s to s%s\r\n",settings_filename, backup_filename);
-            free((void*)settings_str);
-            pico_unmount();
-            return false;
-        }
-        printf("opening/creating file %s for read/write\r\n", settings_filename);
-        file = pico_open(settings_filename, LFS_O_RDWR | LFS_O_CREAT);
-        if (file < 0) {
-            printf("could not open %s for writing\r\n",settings_filename);
+        // file exists. Truncate it to 0 length in preparation for new data
+        error_code = pico_close(file);
+        if (error_code != LFS_ERR_OK) {
+            printf("error %s closing %s\r\n", pico_errmsg(error_code), settings_filename);
             free((void*)settings_str);
             pico_unmount();
             return file;
         }
+
+        file = pico_open(settings_filename, LFS_O_WRONLY);
+        if (file < 0) {
+            printf("error %s opening %s for writing\r\n", pico_errmsg(file), settings_filename);
+            free((void*)settings_str);
+            pico_unmount();
+            return file;
+        }
+#if 0
+        error_code = pico_truncate(file, 0);
+        if (error_code != LFS_ERR_OK) {
+            printf("error %s truncating exiting settings file %s\r\n", pico_errmsg(error_code), settings_filename);
+            free((void*)settings_str);
+            pico_close(file);
+            pico_unmount();
+            return error_code;
+        }
+#endif
     }
-    printf("writing\r\n%s\r\nto file %s\r\n", settings_str, settings_filename);
+    printf("writing settings to file %s\r\n", settings_filename);
     // file is open for writing; write the settings
     error_code = pico_write(file, settings_str, strlen(settings_str)+1);
 
@@ -358,7 +345,7 @@ void rppicomidi::Settings_file::static_file_system_format(EmbeddedCli*, char*, v
     else {
         error_code = pico_unmount();
         if (error_code != LFS_ERR_OK) {
-            printf("unexpected error %d unmounting settings file system\r\n", error_code);
+            printf("unexpected error %s unmounting settings file system\r\n", pico_errmsg(error_code));
         }
         else {
             printf("File system successfully formated and unmounted\r\n");
@@ -441,7 +428,7 @@ void rppicomidi::Settings_file::static_print_file(EmbeddedCli* cli, char* args, 
             printf("IO Error reading %s\r\n", fn);
             break;
         default:
-            printf("Unexpected Error %d reading %s\r\n", error_code, fn);
+            printf("Unexpected Error %s reading %s\r\n", pico_errmsg(error_code), fn);
             break;
         }
     }
@@ -473,13 +460,13 @@ void rppicomidi::Settings_file::static_delete_file(EmbeddedCli* cli, char* args,
                 printf("IO Error deleting %s\r\n", fn);
                 break;
             default:
-                printf("Unexpected Error %d deleting %s\r\n", error_code, fn);
+                printf("Unexpected Error %s deleting %s\r\n", pico_errmsg(error_code), fn);
                 break;
             }
         }
         error_code = pico_unmount();
         if (error_code != LFS_ERR_OK) {
-            printf("Unexpected Error %d unmounting settings file system\r\n", error_code);
+            printf("Unexpected Error %s unmounting settings file system\r\n", pico_errmsg(error_code));
         }
     }
 }
