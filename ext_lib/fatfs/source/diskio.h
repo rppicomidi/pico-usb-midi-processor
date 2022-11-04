@@ -4,9 +4,11 @@
 
 #ifndef _DISKIO_DEFINED
 #define _DISKIO_DEFINED
-
+#include "tusb.h"
 #ifdef __cplusplus
 extern "C" {
+#else
+#include <stdbool.h>
 #endif
 
 /* Status of Disk Functions */
@@ -70,6 +72,23 @@ DRESULT disk_ioctl (BYTE pdrv, BYTE cmd, void* buff);
 #define ATA_GET_MODEL		21	/* Get model name */
 #define ATA_GET_SN			22	/* Get serial number */
 
+/* Helper functions for managing USB FAT drives in tinyusb */
+typedef enum {MMC_FAT_IN_PROGRESS, MMC_FAT_COMPLETE, MMC_FAT_ERROR} mmc_fat_xfer_status_t;
+void mmc_fat_unplug(BYTE pdrv);
+
+void mmc_fat_plug_in(BYTE pdrv);
+
+bool mmc_fat_is_plugged_in(BYTE pdrv);
+
+void mmc_fat_init();
+
+void mmc_fat_set_status(mmc_fat_xfer_status_t stat);
+
+mmc_fat_xfer_status_t mmc_fat_get_xfer_status();
+
+void mmc_fat_wait_transfer_complete();
+
+bool mmc_fat_complete_cb(uint8_t dev_addr, msc_cbw_t const* cbw, msc_csw_t const* csw);
 #ifdef __cplusplus
 }
 #endif
