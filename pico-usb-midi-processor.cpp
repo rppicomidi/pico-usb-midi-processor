@@ -390,3 +390,63 @@ void tuh_midi_tx_cb(uint8_t dev_addr)
 {
     (void)dev_addr;
 }
+
+#if 1
+//--------------------------------------------------------------------+
+// MSC implementation
+//--------------------------------------------------------------------+
+#include "ff.h"
+#include "diskio.h"
+#include "rp2040_rtc.h"
+extern "C" DWORD get_fattime(void)
+{
+    return rppicomidi::Rp2040_rtc::instance().get_32bit_date_time();
+}
+
+static scsi_inquiry_resp_t inquiry_resp;
+static FATFS fatfs[CFG_TUH_MSC];
+bool inquiry_complete_cb(uint8_t dev_addr, msc_cbw_t const* cbw, msc_csw_t const* csw)
+{
+    if (csw->status != 0) {
+        printf("Inquiry failed\r\n");
+        return false;
+    }
+
+    // Print out Vendor ID, Product ID and Rev
+    printf("%.8s %.16s rev %.4s\r\n", inquiry_resp.vendor_id, inquiry_resp.product_id, inquiry_resp.product_rev);
+
+    // Get capacity of device
+    uint32_t const block_count = tuh_msc_get_block_count(dev_addr, cbw->lun);
+    uint32_t const block_size = tuh_msc_get_block_size(dev_addr, cbw->lun);
+
+    printf("Disk Size: %lu MB\r\n", block_count / ((1024*1024)/block_size));
+    printf("Block Count = %lu, Block Size: %lu\r\n", block_count, block_size);
+
+    return true;
+}
+
+//------------- IMPLEMENTATION -------------//
+void tuh_msc_mount_cb(uint8_t dev_addr)
+{
+    printf("A MassStorage device is mounted\r\n");
+
+    uint8_t pdrv = dev_addr-1;
+    mmc_fat_plug_in(pdrv);
+    uint8_t const lun = 0;
+    tuh_msc_inquiry(dev_addr, lun, &inquiry_resp, inquiry_complete_cb);
+    if ( f_mount(&fatfs[pdrv],"", 0) != FR_OK ) {
+        printf("mount failed\r\n");
+        return;
+    }
+}
+
+void tuh_msc_umount_cb(uint8_t dev_addr)
+{
+    printf("A MassStorage device is unmounted\r\n");
+
+    uint8_t pdrv = dev_addr-1;
+
+    f_mount(NULL, "", 0); // unmount disk
+    mmc_fat_unplug(pdrv);
+}
+#endif
