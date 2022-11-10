@@ -376,7 +376,7 @@ void tuh_midi_rx_cb(uint8_t dev_addr, uint32_t num_packets)
         while (num_packets>0) {
             --num_packets;
             uint8_t packet[4];
-            if (tuh_midi_packet_read(dev_addr, packet)) {
+            while (tuh_midi_packet_read(dev_addr, packet)) {
                 uint8_t cable = rppicomidi::Midi_processor::get_cable_num(packet);
                 if (rppicomidi::Midi_processor_manager::instance().filter_midi_in(cable, packet)) {
                     tud_midi_packet_write(packet);
