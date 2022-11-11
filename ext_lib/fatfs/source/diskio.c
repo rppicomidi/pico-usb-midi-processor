@@ -45,75 +45,76 @@
 static DSTATUS disk_state[CFG_TUH_DEVICE_MAX];
 static mutex_t mmc_fat_mutex;
 
-static  mmc_fat_xfer_status_t mmc_fat_status;
+static  msc_fat_xfer_status_t mmc_fat_status;
 /*-----------------------------------------------------------------------*/
 /* MMC plug status functions                                             */
 /*-----------------------------------------------------------------------*/
-void mmc_fat_unplug(
+void msc_fat_unplug(
     BYTE pdrv		/* Physical drive nmuber to identify the drive */
 )
 {
-    if (pdrv < CFG_TUH_MSC)
+    if (pdrv < CFG_TUH_DEVICE_MAX)
         disk_state[pdrv] |= STA_NOINIT | STA_NODISK;;
 }
 
-void mmc_fat_plug_in(
+void msc_fat_plug_in(
     BYTE pdrv		/* Physical drive nmuber to identify the drive */
 )
 {
-    if (pdrv < CFG_TUH_MSC)
+    if (pdrv < CFG_TUH_DEVICE_MAX)
         disk_state[pdrv] &= ~STA_NODISK;
 }
 
-bool mmc_fat_is_plugged_in(
+bool msc_fat_is_plugged_in(
     BYTE pdrv		/* Physical drive nmuber to identify the drive */
 )
 {
     bool plugged_in = false;
-    if (pdrv < CFG_TUH_MSC) {
+    if (pdrv < CFG_TUH_DEVICE_MAX) {
         plugged_in = (disk_state[pdrv] & STA_NODISK) == 0;
     }
     return plugged_in;
 }
 
-void mmc_fat_init()
+void msc_fat_init()
 {
     mutex_init(&mmc_fat_mutex);
-    mmc_fat_status = MMC_FAT_ERROR;
+    mmc_fat_status = MSC_FAT_ERROR;
     for (int pdrv=0;pdrv<CFG_TUH_DEVICE_MAX;pdrv++)
-        mmc_fat_unplug(pdrv); // assume no drives are plugged int
+        msc_fat_unplug(pdrv); // assume no drives are plugged int
 }
 
-void mmc_fat_set_status(mmc_fat_xfer_status_t stat)
+void msc_fat_set_status(msc_fat_xfer_status_t stat)
 {
     mutex_enter_blocking(&mmc_fat_mutex);
     mmc_fat_status = stat;
     mutex_exit(&mmc_fat_mutex);
 }
 
-mmc_fat_xfer_status_t mmc_fat_get_xfer_status()
+msc_fat_xfer_status_t msc_fat_get_xfer_status()
 {
     mutex_enter_blocking(&mmc_fat_mutex);
-    mmc_fat_xfer_status_t res = mmc_fat_status;
+    msc_fat_xfer_status_t res = mmc_fat_status;
     mutex_exit(&mmc_fat_mutex);
     return res;
 }
 
-void mmc_fat_wait_transfer_complete()
+void msc_fat_wait_transfer_complete()
 {
-    while(mmc_fat_get_xfer_status() == MMC_FAT_IN_PROGRESS) {
+    while(msc_fat_get_xfer_status() == MSC_FAT_IN_PROGRESS) {
+        main_loop_task();
     }
 }
 
-bool mmc_fat_complete_cb(uint8_t dev_addr, msc_cbw_t const* cbw, msc_csw_t const* csw)
+bool msc_fat_complete_cb(uint8_t dev_addr, msc_cbw_t const* cbw, msc_csw_t const* csw)
 {
     (void)dev_addr;
     (void)cbw;
     if (csw->status == MSC_CSW_STATUS_PASSED) {
-        mmc_fat_set_status(MMC_FAT_COMPLETE);
+        msc_fat_set_status(MSC_FAT_COMPLETE);
     }
     else {
-        mmc_fat_set_status(MMC_FAT_ERROR);
+        msc_fat_set_status(MSC_FAT_ERROR);
     }
     return csw->status == MSC_CSW_STATUS_PASSED;
 }
@@ -145,6 +146,8 @@ DSTATUS disk_initialize (
     if (pdrv < CFG_TUH_DEVICE_MAX) {
         if ((disk_state[pdrv] & STA_NODISK) == 0) {
             disk_state[pdrv] = 0;
+            stat = 0;
+            msc_fat_set_status(MSC_FAT_COMPLETE);
         }
     }
 
@@ -170,15 +173,15 @@ DRESULT disk_read (
             res = RES_NOTRDY;
         }
         else {
-            assert(mmc_fat_get_xfer_status() == MMC_FAT_COMPLETE);
+            assert(msc_fat_get_xfer_status() == MSC_FAT_COMPLETE);
             uint8_t dev_addr = pdrv+1;
-            mmc_fat_set_status(MMC_FAT_IN_PROGRESS);
-            if (!tuh_msc_read10(dev_addr, 0, buff, sector, count, mmc_fat_complete_cb)) {
+            msc_fat_set_status(MSC_FAT_IN_PROGRESS);
+            if (!tuh_msc_read10(dev_addr, 0, buff, sector, count, msc_fat_complete_cb)) {
                 res = RES_ERROR;
             }
             else {
-                mmc_fat_wait_transfer_complete();
-                if (mmc_fat_get_xfer_status() == MMC_FAT_ERROR) {
+                msc_fat_wait_transfer_complete();
+                if (msc_fat_get_xfer_status() == MSC_FAT_ERROR) {
                     res = RES_ERROR;
                 }
                 else {
@@ -211,15 +214,15 @@ DRESULT disk_write (
             res = RES_NOTRDY;
         }
         else {
-            assert(mmc_fat_get_xfer_status() == MMC_FAT_COMPLETE);
+            assert(msc_fat_get_xfer_status() == MSC_FAT_COMPLETE);
             uint8_t dev_addr = pdrv+1;
-            mmc_fat_set_status(MMC_FAT_IN_PROGRESS);
-            if (!tuh_msc_write10(dev_addr, 0, buff, sector, count, mmc_fat_complete_cb)) {
+            msc_fat_set_status(MSC_FAT_IN_PROGRESS);
+            if (!tuh_msc_write10(dev_addr, 0, buff, sector, count, msc_fat_complete_cb)) {
                 res = RES_ERROR;
             }
             else {
-                mmc_fat_wait_transfer_complete();
-                if (mmc_fat_get_xfer_status() == MMC_FAT_ERROR) {
+                msc_fat_wait_transfer_complete();
+                if (msc_fat_get_xfer_status() == MSC_FAT_ERROR) {
                     res = RES_ERROR;
                 }
                 else {
@@ -246,10 +249,38 @@ DRESULT disk_ioctl (
 {
     (void)buff;
     (void)pdrv;
-
-    if (cmd != CTRL_SYNC)
-        return RES_ERROR;
-    return RES_OK;
+    DRESULT res = RES_OK;
+    if (disk_state[pdrv] != 0) {
+        res = RES_ERROR; // not mounted
+    }
+    else {
+        switch(cmd) {
+        case CTRL_SYNC:
+            break;
+        case GET_SECTOR_COUNT:
+        {
+            LBA_t* ptr = (LBA_t*)buff;
+            *ptr = tuh_msc_get_block_count(pdrv+1, 0);
+        }
+            break;
+        case GET_SECTOR_SIZE:
+        {
+            WORD* ptr = (WORD*)buff;
+            *ptr = tuh_msc_get_block_size(pdrv+1, 0);
+        }
+            break;
+        case GET_BLOCK_SIZE:
+        {
+            DWORD* ptr = (DWORD*)buff;
+            *ptr = 1; // unknown
+        }
+            break;
+        default:
+            res = RES_ERROR;
+            break;
+        }
+    }
+    return res;
 }
 
 #endif

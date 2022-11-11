@@ -5,6 +5,7 @@
 #ifndef _DISKIO_DEFINED
 #define _DISKIO_DEFINED
 #include "tusb.h"
+#include "pico/multicore.h"
 #ifdef __cplusplus
 extern "C" {
 #else
@@ -73,22 +74,75 @@ DRESULT disk_ioctl (BYTE pdrv, BYTE cmd, void* buff);
 #define ATA_GET_SN			22	/* Get serial number */
 
 /* Helper functions for managing USB FAT drives in tinyusb */
-typedef enum {MMC_FAT_IN_PROGRESS, MMC_FAT_COMPLETE, MMC_FAT_ERROR} mmc_fat_xfer_status_t;
-void mmc_fat_unplug(BYTE pdrv);
+typedef enum {MSC_FAT_IN_PROGRESS, MSC_FAT_COMPLETE, MSC_FAT_ERROR} msc_fat_xfer_status_t;
 
-void mmc_fat_plug_in(BYTE pdrv);
+/**
+ * @brief set the status to drive unplugged
+ * 
+ * @param pdrv the physical drive number
+ */
+void msc_fat_unplug(BYTE pdrv);
 
-bool mmc_fat_is_plugged_in(BYTE pdrv);
+/**
+ * @brief set the status to drive present
+ * 
+ * @param pdrv the physical drive number
+ */
+void msc_fat_plug_in(BYTE pdrv);
 
-void mmc_fat_init();
+/**
+ * @brief check if the drive is plugged in
+ * 
+ * @param pdrv the physical drive number
+ * @return true if the drive is plugged in
+ * @return false if not plugged in
+ */
+bool msc_fat_is_plugged_in(BYTE pdrv);
 
-void mmc_fat_set_status(mmc_fat_xfer_status_t stat);
+/**
+ * @brief initialize the diskio module for use with the MSC
+ */
+void msc_fat_init();
 
-mmc_fat_xfer_status_t mmc_fat_get_xfer_status();
+/**
+ * @brief set the current transfer status
+ * 
+ * @param stat the transfer status
+ */
+void msc_fat_set_status(msc_fat_xfer_status_t stat);
 
-void mmc_fat_wait_transfer_complete();
+/**
+ * @brief get the current transfer status
+ * 
+ * @return msc_fat_xfer_status_t the current transfer status
+ */
+msc_fat_xfer_status_t msc_fat_get_xfer_status();
 
-bool mmc_fat_complete_cb(uint8_t dev_addr, msc_cbw_t const* cbw, msc_csw_t const* csw);
+/**
+ * @brief wait for the current MSC transfer to complete
+ * 
+ */
+void msc_fat_wait_transfer_complete();
+
+/**
+ * @brief callback when the current pending MSC transfer is complete
+ * 
+ * @param dev_addr the address of the attached MSC device
+ * @param cbw the command block wrapper structure
+ * @param csw the command status wrapper structure
+ * @return true if transfer was successful
+ * @return false if the transfer failed or there was a phase error
+ */
+bool msc_fat_complete_cb(uint8_t dev_addr, msc_cbw_t const* cbw, msc_csw_t const* csw);
+
+/**
+ * @brief The task function for the main() function "superloop"
+ *
+ * This function must call tuh_task() and may call whatever functions
+ * are required to make the main loop feel responsive whilst
+ * msc_fat_wait_transfer_complete() blocks for completed transfers
+ */
+void main_loop_task();
 #ifdef __cplusplus
 }
 #endif
