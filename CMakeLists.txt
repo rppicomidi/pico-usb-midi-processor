@@ -20,7 +20,8 @@ set(PICO_PIO_USB_SRC "${PICO_TINYUSB_PATH}/hw/mcu/raspberry_pi/Pico-PIO-USB/src"
 pico_generate_pio_header(${target_name} ${PICO_PIO_USB_SRC}/usb_tx.pio)
 pico_generate_pio_header(${target_name} ${PICO_PIO_USB_SRC}/usb_rx.pio)
 
-set(FATFS_PATH "${CMAKE_CURRENT_LIST_DIR}/ext_lib/fatfs/source")
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/ext_lib/fatfs/source)
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/lib/rp2040_rtc)
 target_sources(${target_name} PRIVATE
  pico-usb-midi-processor.cpp
  usb_descriptors.c
@@ -35,7 +36,7 @@ target_sources(${target_name} PRIVATE
  midi_processor_chan_mes_remap.cpp
  midi_processor_chan_mes_remap_settings_view.cpp
  preset_view.cpp
- rp2040_rtc.cpp
+ clock_set_view.cpp
  ${PICO_PIO_USB_SRC}/pio_usb.c
  ${PICO_PIO_USB_SRC}/pio_usb_device.c
  ${PICO_PIO_USB_SRC}/pio_usb_host.c
@@ -46,14 +47,9 @@ target_sources(${target_name} PRIVATE
  ${PICO_TINYUSB_PATH}/src/portable/raspberrypi/pio_usb/dcd_pio_usb.c
  ${PICO_TINYUSB_PATH}/src/portable/raspberrypi/pio_usb/hcd_pio_usb.c
  ${EMBEDDED_CLI_PATH}/src/embedded_cli.c
-
- ${FATFS_PATH}/ff.c
- ${FATFS_PATH}/diskio.c
- ${FATFS_PATH}/ffunicode.c
- ${FATFS_PATH}/ffsystem.c
 )
 target_link_options(${target_name} PRIVATE -Xlinker --print-memory-usage)
-target_compile_options(${target_name} PRIVATE -Wall -Wextra)
+target_compile_options(${target_name} PRIVATE -Wall -Wextra -DCFG_TUSB_DEBUG=1 -DPICO_HEAP_SIZE=0x20000)
 target_compile_definitions(${target_name} PRIVATE
 PICO_DEFAULT_UART_TX_PIN=16
 PICO_DEFAULT_UART_RX_PIN=17
@@ -62,11 +58,10 @@ target_include_directories(${target_name} PRIVATE
 ${PICO_PIO_USB_SRC} ${CMAKE_CURRENT_LIST_DIR}
 ${CMAKE_CURRENT_LIST_DIR}/ext_lib/parson
 ${EMBEDDED_CLI_PATH}/include
-${CMAKE_CURRENT_LIST_DIR}/ext_lib/fatfs
 ${FATFS_PATH}
 )
 
 target_link_libraries(${target_name} PRIVATE pico_stdlib pico_multicore hardware_pio hardware_dma tinyusb_device tinyusb_host 
-ssd1306 ssd1306i2c text_box mono_graphics_lib ui_menu ui_view_manager ui_nav_buttons ui_text_item_chooser littlefs-lib hardware_rtc)
+ssd1306 ssd1306i2c text_box mono_graphics_lib ui_menu ui_view_manager ui_nav_buttons ui_text_item_chooser littlefs-lib rp2040_rtc msc_fatfs)
 pico_add_extra_outputs(${target_name})
 
