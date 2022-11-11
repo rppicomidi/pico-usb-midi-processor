@@ -69,7 +69,6 @@ public:
     void operator=(Pico_usb_midi_processor const&) = delete;
 
     Pico_usb_midi_processor();
-    void add_all_cli_commands(EmbeddedCli *cli);
     void task();
     void clone_complete_cb();
     void poll_midi_dev_rx();
@@ -151,11 +150,6 @@ rppicomidi::Pico_usb_midi_processor::Pico_usb_midi_processor()  : addr{OLED_ADDR
         }
     }
     assert(success);
-}
-
-void rppicomidi::Pico_usb_midi_processor::add_all_cli_commands(EmbeddedCli *cli)
-{
-    Midi_processor_manager::instance().add_all_cli_commands(cli);
 }
 
 void rppicomidi::Pico_usb_midi_processor::poll_midi_dev_rx()
@@ -328,7 +322,9 @@ int main()
     // initialize the Pico_usb_midi_processor object instance and the associated CLI
     auto instance_ptr=&rppicomidi::Pico_usb_midi_processor::instance();
 
-    instance_ptr->add_all_cli_commands(cli);
+    rppicomidi::Settings_file::instance().add_all_cli_commands(cli);
+    msc_fat_init();
+
     TU_LOG1("pico-usb-midi-processor\r\n");
     while(getchar_timeout_us(0) != PICO_ERROR_TIMEOUT) {
         // flush out the console input buffer

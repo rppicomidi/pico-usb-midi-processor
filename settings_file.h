@@ -61,7 +61,21 @@ template <typename I> void n2hexstr(I w, char* hex_cstr, size_t max_cstr) {
 
 class Settings_file {
 public:
-    Settings_file();
+    // Singleton Pattern
+
+    /**
+     * @brief Get the Instance object
+     *
+     * @return the singleton instance
+     */
+    static Settings_file& instance()
+    {
+        static Settings_file _instance; // Guaranteed to be destroyed.
+                                        // Instantiated on first use.
+        return _instance;
+    }
+    Settings_file(Settings_file const&) = delete;
+    void operator=(Settings_file const&) = delete;
 
     void add_all_cli_commands(EmbeddedCli *cli);
     /**
@@ -112,6 +126,8 @@ public:
         fn[4] = '-';
     }
 private:
+    Settings_file();
+
     /**
      * @brief get the JSON serialized string from the file named settings_filename
      *

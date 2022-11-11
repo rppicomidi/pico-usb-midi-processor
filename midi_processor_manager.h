@@ -285,7 +285,7 @@ public:
 
     bool load_preset(uint8_t preset)
     {
-        bool result = settings_file.load_preset(preset);
+        bool result = Settings_file::instance().load_preset(preset);
         if (result) {
             dirty = false;
         }
@@ -328,7 +328,7 @@ private:
     std::vector<std::vector<Midi_processor_fn>> midi_out_proc_fns;
     std::vector<Midi_processor*> processors_with_tasks;
     Mono_graphics* screen;
-    Settings_file settings_file;
+    //Settings_file settings_file;
     Setting_number<uint8_t> current_preset;
     bool dirty;
     char id_str[10];

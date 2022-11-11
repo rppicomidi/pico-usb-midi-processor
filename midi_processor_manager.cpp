@@ -44,11 +44,7 @@ rppicomidi::Midi_processor_manager::Midi_processor_manager() : screen{nullptr}, 
                         Midi_processor_chan_mes_remap_settings_view::static_make_new});
     *id_str = '\0';
     *prod_str = '\0';
-}
-
-void rppicomidi::Midi_processor_manager::add_all_cli_commands(EmbeddedCli *cli)
-{
-    settings_file.add_all_cli_commands(cli);
+    Settings_file::instance(); // construct the Settings_file instance
 }
 
 void rppicomidi::Midi_processor_manager::set_connected_device(uint16_t vid_, uint16_t pid_, const char* prod_str_, uint8_t num_in_cables_, uint8_t num_out_cables_)
@@ -63,12 +59,12 @@ void rppicomidi::Midi_processor_manager::set_connected_device(uint16_t vid_, uin
         midi_out_proc_fns.push_back(std::vector<Midi_processor_fn>());
     }
     // Get stored settings for this device if any
-    settings_file.set_vid_pid(vid_, pid_);
-    if (!settings_file.load()) {
+    Settings_file::instance().set_vid_pid(vid_, pid_);
+    if (!Settings_file::instance().load()) {
         printf("error loading settings for device %04x-%04x\r\n", vid_, pid_);
     }
     strncpy(prod_str, prod_str_, MAX_PROD_STR_NAME);
-    settings_file.get_filename(id_str);
+    Settings_file::instance().get_filename(id_str);
     prod_str[MAX_PROD_STR_NAME] = '\0';
 }
 
