@@ -78,11 +78,6 @@ public:
     Midi_processor_manager(Midi_processor_manager const&) = delete;
     void operator=(Midi_processor_manager const&) = delete;
 
-    /**
-     * @brief Construct a new Midi_processor_manager object
-     */
-    Midi_processor_manager();
-
     void add_all_cli_commands(EmbeddedCli *cli);
     /**
      * @brief Get the number of MIDI Processor types
@@ -294,13 +289,18 @@ public:
     bool store_preset(uint8_t preset)
     {   bool result = false;;
         if (current_preset.set(preset)) {
-            result = settings_file.store();
+            result = Settings_file::instance().store();
             dirty = result != 0;
         }
         return result;
     }
     void clear_all_processors();
 private:
+    /**
+     * @brief Construct a new Midi_processor_manager object
+     */
+    Midi_processor_manager();
+
     /**
      * @brief rebuild the midi_in_proc_fns midi_out_proc_fns and processors_with_tasks
      * vectors.
