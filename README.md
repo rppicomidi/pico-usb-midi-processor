@@ -37,6 +37,11 @@ connected to it. Each new external MIDI device gets its own
 set of 8 presets stored, so you will likely never run out
 of presets.
 
+The PUMP USB A port can also accept a USB Flash Drive to allow you to back up and restore all of your presets. Future versions of
+this code will allow you to restore the presets of one device at a
+time, and will allow you to export and import presets one preset
+at a time to any one device.
+
 # Disclaimers
 
 This project requires correctly soldering a USB host port connector
@@ -146,6 +151,7 @@ whilst both RP2040 cores are active
 - the embedded-cli project to implement a debug command line
 interpreter; type help on the serial port console for a list of 
 commands.
+- the elm-chan fatfs file system modified to work with tinyusb for implementing external flash drive for preset backkup
 - some modified font files from various projects for the OLEDs
 
 Some original library code includes
@@ -194,11 +200,15 @@ $PICO_DIR
         |
         +--ext_lib
             |
+            +--embedded-cli (for debugging lfs and fatfs)
+            |
+            +--fatfs (more recent fatfs rev than tinyusb's fatfs)
+            |
             +--littlefs-lib (from my forked code)
             |
-            +--parson
+            +--parson (a git submodule)
             |
-            +--RPi-Pico-SSD1306-library
+            +--RPi-Pico-SSD1306-library (a font library)
             |
             +--ssd1306
 ```
@@ -322,25 +332,24 @@ setup screen. To go all the way back to the home screen,
 hold the Shift button and then press the Back/Home button.
 
 If you added a processor by mistake, highlight the processor using
-the Up and Down buttons and then press the Left button to delete it.
-There is no confirmation, so be careful. You can configure the processor
-by using the Up or Down buttons to highlight it, then pressing Enter.
+the Up and Down buttons. Press and hold the Shift button and then
+press the Left button to delete it.
+There is no confirmation, so be careful. You can configure the
+processor by using the Up or Down buttons to highlight it, then
+pressing Enter.
 
-You adjust most processor parameters by using the Up and Down buttons
-to choose the paramater, then press the Enter button
-to edit the paramater. If it is a toggle parameter (like the Display
-Decimal/Hex format setting), pressing the Enter button just
+You adjust most processor parameters by using the Up and Down
+buttons to choose the paramater, then press the Enter button
+to edit the paramater. If it is a toggle parameter (like the
+Display Decimal/Hex format setting), pressing the Enter button just
 toggles the parameter. If it is a parameter you choose from a list,
 then pressing Enter will change to a screen with the list of items
-to choose; navigate to the item you want and press Enter to select it.
-Otherwise, pressing Enter will highlight the value you can change. In
-this edit mode, the Up and Down buttons increment or decrement the
-paramter value. Holding the Up or Down buttons will repeat the increment
-or decrement action. Press and hold Shift and then pressing Up or Down
-will increase the increment or decrement interval. If there are
-multiple parameters on a line, use the Left button or Right
-button to choose the parameter to increment or decrement. When you are
-done editing parameters in edit mode, press the Enter button again.
+to choose; navigate to the item you want and press Enter to select
+it. Otherwise, pressing Enter will highlight the value you can
+change. In this edit mode, the Up and Down buttons increment or
+decrement the paramter value. Holding the Up or Down buttons will repeat the increment or decrement action. Press and hold Shift and then pressing Up or Down will increase the increment or decrement interval. If there are multiple parameters on a line, use the Left
+button or Right button to choose the parameter to increment or
+decrement. When you are done editing parameters in edit mode, press the Enter button again.
 
 Once you start editing presets, the home screen will show
 `Preset:1[M]` or similar. The `[M]` means that the current
