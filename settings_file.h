@@ -35,6 +35,7 @@
 #include <string>
 #include "littlefs-lib/pico_hal.h"
 #include "embedded_cli.h"
+#include "ff.h"
 
 namespace rppicomidi {
 /**
@@ -125,6 +126,14 @@ public:
         n2hexstr<uint16_t>(pid, fn+5, 4);
         fn[4] = '-';
     }
+
+    /**
+     * @brief copy all presets in the local file system to external flash drive
+     * 
+     * The presets will be stored in a directory named MM-DD-YYYY-HH-MM-SS
+     * @return FR_OK if no error, an error code otherwise 
+     */
+    FRESULT backup_presets();
 private:
     Settings_file();
 
@@ -132,11 +141,12 @@ private:
      * @brief get the JSON serialized string from the file named settings_filename
      *
      * @param raw_settings_ptr 
-     * @return int 
+     * @return int the number of bytes in the settings string, or a negative
+     * LFS error code if there was an error.
      */
     int load_settings_string(char** raw_settings_ptr);
 
-    int load_settings_string(const char* fn, char** raw_settings_ptr);
+    int load_settings_string(const char* fn, char** raw_settings_ptr, bool mount=true);
     /**
      * @brief See https://github.com/littlefs-project/littlefs/issues/2
      * 
@@ -151,6 +161,9 @@ private:
     static void static_list_files(EmbeddedCli* cli, char* args, void* context);
     static void static_print_file(EmbeddedCli* cli, char* args, void* context);
     static void static_delete_file(EmbeddedCli* cli, char* args, void*);
+    static void static_fatfs_cd(EmbeddedCli* cli, char* args, void*);
+    static void static_fatfs_ls(EmbeddedCli* cli, char* args, void*);
+    static void static_fatfs_backup(EmbeddedCli* cli, char* args, void*);
 
     uint16_t vid;       // the idVendor of the connected device (not serialized here)
     uint16_t pid;       // the idProduct of the connected device (not serialized here)

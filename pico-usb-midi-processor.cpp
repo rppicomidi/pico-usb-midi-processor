@@ -48,7 +48,10 @@
 #include "midi_processor.h"
 #include "midi_processor_manager.h"
 #include "embedded_cli.h"
-
+#include "ff.h"
+#include "diskio.h"
+#include "rp2040_rtc.h"
+#include "clock_set_view.h"
 namespace rppicomidi {
 class Pico_usb_midi_processor {
 public:
@@ -89,7 +92,7 @@ public:
     Mono_graphics oled_screen; // the screen object
     View_manager oled_view_manager; // the view manager object
     uint8_t midi_dev_addr;  // The device address of the connected device
-    enum {MIDI_DEVICE_NOT_INITIALIZED, MIDI_DEVICE_NEEDS_INIT, MIDI_DEVICE_IS_INITIALIZED} midi_device_status;
+    enum {MIDI_DEVICE_NOT_INITIALIZED, MIDI_DEVICE_NEEDS_INIT, MIDI_DEVICE_IS_INITIALIZED, MIDI_DEVICE_MSC_ATTACHED} midi_device_status;
 
     static uint16_t render_done_mask;
     static void callback(uint8_t display_num)
@@ -201,6 +204,15 @@ void rppicomidi::Pico_usb_midi_processor::task()
             poll_midi_dev_rx();
             Midi_processor_manager::instance().task();
         }
+    }
+    else if (midi_device_status == MIDI_DEVICE_MSC_ATTACHED) {
+        auto clkset_ptr = new rppicomidi::Clock_set_view(oled_screen, oled_screen.get_clip_rect());
+        assert(clkset_ptr);
+        home_screen.enter_preset_backup_mode(*clkset_ptr);
+        home_screen.draw();
+        oled_view_manager.go_home();
+        oled_view_manager.push_view(clkset_ptr);
+        midi_device_status = MIDI_DEVICE_NOT_INITIALIZED;
     }
 
     nav_buttons.poll();
@@ -346,8 +358,7 @@ int main()
 // TinyUSB Callbacks
 //--------------------------------------------------------------------+
 
-// Invoked when device with hid interface is mounted
-// Report descriptor is also available for use. 
+// Invoked when device with midi interface is mounted
 void tuh_midi_mount_cb(uint8_t dev_addr, uint8_t in_ep, uint8_t out_ep, uint8_t num_cables_rx, uint16_t num_cables_tx)
 {
     TU_LOG1("MIDI device address = %u, IN endpoint %u has %u cables, OUT endpoint %u has %u cables\r\n",
@@ -357,7 +368,7 @@ void tuh_midi_mount_cb(uint8_t dev_addr, uint8_t in_ep, uint8_t out_ep, uint8_t 
     set_cloning_required();
 }
 
-// Invoked when device with hid interface is un-mounted
+// Invoked when device with midi interface is un-mounted
 void tuh_midi_umount_cb(uint8_t dev_addr, uint8_t instance)
 {
     rppicomidi::Pico_usb_midi_processor::instance().midi_dev_addr = 0;
@@ -387,20 +398,33 @@ void tuh_midi_tx_cb(uint8_t dev_addr)
     (void)dev_addr;
 }
 
-#if 1
 //--------------------------------------------------------------------+
 // MSC implementation
 //--------------------------------------------------------------------+
-#include "ff.h"
-#include "diskio.h"
-#include "rp2040_rtc.h"
-extern "C" DWORD get_fattime(void)
+extern "C" void main_loop_task()
 {
-    return rppicomidi::Rp2040_rtc::instance().get_32bit_date_time();
+    if (rppicomidi::Pico_usb_midi_processor::instance().oled_screen.can_render()) {
+        rppicomidi::Pico_usb_midi_processor::instance().oled_screen.render_non_blocking(nullptr, 0);
+    }
+    rppicomidi::Pico_usb_midi_processor::instance().oled_screen.task();
+
+    // flash the Pico board LED
+    static absolute_time_t previous_timestamp = {0};
+
+    static bool led_state = false;
+
+    absolute_time_t now = get_absolute_time();
+    
+    int64_t diff = absolute_time_diff_us(previous_timestamp, now);
+    if (diff > 1000000) {
+        gpio_put(rppicomidi::Pico_usb_midi_processor::instance().LED_GPIO, led_state);
+        led_state = !led_state;
+        previous_timestamp = now;
+    }
 }
 
 static scsi_inquiry_resp_t inquiry_resp;
-static FATFS fatfs[CFG_TUH_MSC];
+static FATFS fatfs[1];
 bool inquiry_complete_cb(uint8_t dev_addr, msc_cbw_t const* cbw, msc_csw_t const* csw)
 {
     if (csw->status != 0) {
@@ -424,16 +448,18 @@ bool inquiry_complete_cb(uint8_t dev_addr, msc_cbw_t const* cbw, msc_csw_t const
 //------------- IMPLEMENTATION -------------//
 void tuh_msc_mount_cb(uint8_t dev_addr)
 {
-    printf("A MassStorage device is mounted\r\n");
 
     uint8_t pdrv = dev_addr-1;
-    mmc_fat_plug_in(pdrv);
+    assert(pdrv==0);
+    msc_fat_plug_in(pdrv);
     uint8_t const lun = 0;
     tuh_msc_inquiry(dev_addr, lun, &inquiry_resp, inquiry_complete_cb);
     if ( f_mount(&fatfs[pdrv],"", 0) != FR_OK ) {
         printf("mount failed\r\n");
         return;
     }
+    printf("core %d MassStorage device %u is mounted\r\n", get_core_num(), pdrv);
+    rppicomidi::Pico_usb_midi_processor::instance().midi_device_status = rppicomidi::Pico_usb_midi_processor::MIDI_DEVICE_MSC_ATTACHED;
 }
 
 void tuh_msc_umount_cb(uint8_t dev_addr)
@@ -443,6 +469,6 @@ void tuh_msc_umount_cb(uint8_t dev_addr)
     uint8_t pdrv = dev_addr-1;
 
     f_mount(NULL, "", 0); // unmount disk
-    mmc_fat_unplug(pdrv);
+    msc_fat_unplug(pdrv);
+    watchdog_reboot(0,0,10); // wait 10 ms and then reboot
 }
-#endif

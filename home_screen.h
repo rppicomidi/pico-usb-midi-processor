@@ -57,6 +57,12 @@ public:
      * @note the device_label will be truncated to max_device_label characters
      */
     void set_connected_device(const char* device_label_, uint8_t num_in_cables_, uint8_t num_out_cables_);
+
+    /**
+     * @brief Set the home screen for preset backup to external flash drive mode
+     * 
+     */
+    void enter_preset_backup_mode(View& timeset_view);
 private:
     // Get rid of default constructor and copy constructor
     Home_screen() = delete;
@@ -72,5 +78,6 @@ private:
     std::vector<Midi_processor_setup_screen*> midi_in_setup;
     std::vector<Midi_processor_setup_screen*> midi_out_setup;
     Preset_view* preset_view;
+    bool is_preset_backup_mode;
 };
 }

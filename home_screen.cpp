@@ -34,7 +34,7 @@ rppicomidi::Home_screen::Home_screen(Mono_graphics& screen_, const char* device_
     View{screen_, screen_.get_clip_rect()},
     label_font{screen.get_font_12()},
     menu{screen, static_cast<uint8_t>(label_font.height*2+4), label_font},
-    num_in_cables{0}, num_out_cables{0}
+    num_in_cables{0}, num_out_cables{0}, is_preset_backup_mode{false}
 {
     set_connected_device(device_label_, num_in_cables, num_out_cables);
 }
@@ -83,9 +83,11 @@ void rppicomidi::Home_screen::draw()
             screen.draw_string(label_font, 0, label_font.height, line2, strlen(line2), Pixel_state::PIXEL_ONE, Pixel_state::PIXEL_ZERO);
         }
     }
-    char preset_text[max_line_length];
-    sprintf(preset_text, "Preset:%1x%s",Midi_processor_manager::instance().get_current_preset(), Midi_processor_manager::instance().needs_store()?"[M]":"");
-    menu.set_menu_item_text(0,preset_text);
+    if (!is_preset_backup_mode) {
+        char preset_text[max_line_length];
+        sprintf(preset_text, "Preset:%1x%s",Midi_processor_manager::instance().get_current_preset(), Midi_processor_manager::instance().needs_store()?"[M]":"");
+        menu.set_menu_item_text(0,preset_text);
+    }
     menu.draw();
 }
 
@@ -106,6 +108,7 @@ void rppicomidi::Home_screen::set_connected_device(const char* device_label_, ui
     for (uint8_t cable=0; cable < num_out_cables; cable++)
         midi_out_setup.push_back(new Midi_processor_setup_screen{screen, label_font, cable, false});
     printf("New connection %s %u IN %u OUT\r\n", device_label, num_in_cables, num_out_cables);
+    is_preset_backup_mode = false;
     if (num_in_cables !=0 || num_out_cables !=0) {
         preset_view = new Preset_view(screen, screen.get_clip_rect());
         auto preset_item = new View_launch_menu_item(*preset_view, "Presets", screen, label_font);
@@ -126,4 +129,24 @@ void rppicomidi::Home_screen::set_connected_device(const char* device_label_, ui
         menu.entry();
         draw();
     }
+}
+
+static void backup_cb(rppicomidi::View* context)
+{
+    (void)context;
+    rppicomidi::Settings_file::instance().backup_presets();
+}
+
+void rppicomidi::Home_screen::enter_preset_backup_mode(View& timeset_view)
+{
+    is_preset_backup_mode = true;
+    strncpy(device_label, "Save/Restore Presets to Flash Drive", max_device_label);
+    device_label[max_device_label] = '\0';
+    Menu_item* item = new View_launch_menu_item(timeset_view, "Set Date/Time", screen, label_font);
+    assert(item);
+    menu.add_menu_item(item);
+    item = new Callback_menu_item("Backup all", screen, label_font, nullptr, backup_cb);
+    assert(item);
+    menu.add_menu_item(item);
+    menu.entry();
 }
