@@ -91,10 +91,11 @@ rppicomidi::View::Select_result rppicomidi::Midi_processor_setup_screen::on_sele
     return Select_result::no_op;
 }
 
-void rppicomidi::Midi_processor_setup_screen::on_left(uint32_t delta, bool)
+void rppicomidi::Midi_processor_setup_screen::on_left(uint32_t delta, bool is_shifted)
 {
-    if (delta > 1) {
-        // Don't want to delete too many things at one go
+    // require shift button pressed to delete a processor && delta == 1
+    // to prevent accidental deletions
+    if (delta != 1 || !is_shifted) {
         return;
     }
 

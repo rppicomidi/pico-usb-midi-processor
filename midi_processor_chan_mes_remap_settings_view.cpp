@@ -142,8 +142,8 @@ void rppicomidi::Midi_processor_chan_mes_remap_settings_view::static_new_remap_c
 void rppicomidi::Midi_processor_chan_mes_remap_settings_view::on_left(uint32_t delta, bool is_shifted)
 {
     if (menu.get_has_focus()) {
-        // Do not erase multiple items at once by accident
-        if (delta != 1)
+        // Require shift button held and do not erase multiple items at once by accident
+        if (!is_shifted || delta != 1)
             return;
         // Then delete the current menu item if it is a remap item
         size_t idx = menu.get_current_item_idx();
