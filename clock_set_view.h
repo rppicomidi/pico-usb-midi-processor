@@ -36,6 +36,8 @@ class Clock_set_view : public View
 public:
     Clock_set_view(Mono_graphics& screen_, const Rectangle& rect_) : 
         View{screen_, rect_}, item_idx{0}, font{screen.get_font_12()} {}
+    Clock_set_view()=delete;
+    virtual ~Clock_set_view()=default;
     void draw();
     void entry() final;
     Select_result on_select(View** new_view) final;
