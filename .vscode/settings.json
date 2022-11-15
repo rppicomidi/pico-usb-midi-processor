@@ -75,6 +75,14 @@
         "mutex": "cpp",
         "shared_mutex": "cpp",
         "runtime.h": "c",
-        "malloc.h": "c"
+        "malloc.h": "c",
+        "bitset": "cpp",
+        "ctime": "cpp",
+        "set": "cpp",
+        "ratio": "cpp",
+        "regex": "cpp",
+        "iostream": "cpp",
+        "thread": "cpp",
+        "variant": "cpp"
     }
 }
