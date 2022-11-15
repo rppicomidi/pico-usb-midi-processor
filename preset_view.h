@@ -58,9 +58,9 @@ public:
 private:
     static uint8_t static_get_next_preset(void* context);
     static uint8_t static_incr_next_preset(void* context, int delta);
-    static void static_save_callback(View*);
-    static void static_load_callback(View*);
-    static void static_reset_callback(View*);
+    static void static_save_callback(View*, View**);
+    static void static_load_callback(View*, View**);
+    static void static_reset_callback(View*, View**);
     Menu menu;
     Setting_number<uint8_t> next_preset;
 };

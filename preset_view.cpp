@@ -46,21 +46,21 @@ void rppicomidi::Preset_view::draw()
     menu.draw();
 }
 
-void rppicomidi::Preset_view::static_load_callback(View* context_)
+void rppicomidi::Preset_view::static_load_callback(View* context_, View**)
 {
     auto me = reinterpret_cast<Preset_view*>(context_);
     Midi_processor_manager::instance().load_preset(me->next_preset.get());
     me->draw();
 }
 
-void rppicomidi::Preset_view::static_save_callback(View* context_)
+void rppicomidi::Preset_view::static_save_callback(View* context_, View**)
 {
     auto me = reinterpret_cast<Preset_view*>(context_);
     Midi_processor_manager::instance().store_preset(me->next_preset.get());
     me->draw();
 }
 
-void rppicomidi::Preset_view::static_reset_callback(View* context_)
+void rppicomidi::Preset_view::static_reset_callback(View* context_, View**)
 {
     auto me = reinterpret_cast<Preset_view*>(context_);
     Midi_processor_manager::instance().clear_all_processors();

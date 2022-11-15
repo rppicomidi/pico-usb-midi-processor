@@ -102,7 +102,7 @@ void rppicomidi::Midi_processor_chan_mes_remap_settings_view::static_mes_type_se
     me->mes_type_menu_item->set_text(remap_str.c_str());
 }
 
-void rppicomidi::Midi_processor_chan_mes_remap_settings_view::static_toggle_display_format(View* context)
+void rppicomidi::Midi_processor_chan_mes_remap_settings_view::static_toggle_display_format(View* context, View**)
 {
     auto me=reinterpret_cast<Midi_processor_chan_mes_remap_settings_view*>(context);
     auto remap_proc = reinterpret_cast<Midi_processor_chan_mes_remap*>(me->proc);
@@ -126,7 +126,7 @@ void rppicomidi::Midi_processor_chan_mes_remap_settings_view::static_toggle_disp
     me->draw();
 }
 
-void rppicomidi::Midi_processor_chan_mes_remap_settings_view::static_new_remap_callback(View* context)
+void rppicomidi::Midi_processor_chan_mes_remap_settings_view::static_new_remap_callback(View* context, View**)
 {
     auto me=reinterpret_cast<Midi_processor_chan_mes_remap_settings_view*>(context);
     auto remap_proc = reinterpret_cast<Midi_processor_chan_mes_remap*>(me->proc);

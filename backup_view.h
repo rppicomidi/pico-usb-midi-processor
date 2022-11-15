@@ -42,7 +42,7 @@ public:
     void on_increment(uint32_t delta, bool is_shifted) final {menu.on_increment(delta, is_shifted); };
     void on_decrement(uint32_t delta, bool is_shifted) final {menu.on_decrement(delta, is_shifted); };
 private:
-    static void static_start_backup(View* view_);
+    static void static_start_backup(View* view_, View**);
     const Mono_mono_font& font;
     Menu menu;
     Callback_menu_item* backup_all;

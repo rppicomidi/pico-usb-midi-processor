@@ -56,7 +56,7 @@ void rppicomidi::Backup_view::draw()
     }
 }
 
-void rppicomidi::Backup_view::static_start_backup(View* view_)
+void rppicomidi::Backup_view::static_start_backup(View* view_, View**)
 {
     FRESULT res = Settings_file::instance().backup_all_presets();
     if (res != FR_OK) {

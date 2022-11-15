@@ -76,7 +76,7 @@ void rppicomidi::Midi_processor_transpose_view::entry()
     menu.entry();
 }
 
-void rppicomidi::Midi_processor_transpose_view::static_toggle_display_format(View* context)
+void rppicomidi::Midi_processor_transpose_view::static_toggle_display_format(View* context, View**)
 {
     auto me=reinterpret_cast<Midi_processor_transpose_view*>(context);
     auto transpose_proc = reinterpret_cast<Midi_processor_transpose*>(me->proc);
