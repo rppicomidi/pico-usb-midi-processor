@@ -103,6 +103,13 @@ void rppicomidi::Settings_file::add_all_cli_commands(EmbeddedCli *cli)
         false,
         this,
         static_fatfs_backup
+    });
+    embeddedCliAddBinding(cli, {
+        "restore",
+        "restore presets from back. usage: restore [path] or restore [path to one file]",
+        true,
+        this,
+        static_fatfs_restore
     });   
 }
 
@@ -200,10 +207,52 @@ bool rppicomidi::Settings_file::load()
     return result;
 }
 
-
-FRESULT rppicomidi::Settings_file::backup_presets()
+bool rppicomidi::Settings_file::get_next_backup_directory_name(char* dirname, size_t maxname)
 {
-    FRESULT fatres = f_chdir("/");
+    // 10 characters for the date plus a null terminator
+    if (maxname < 11)
+        return false;
+    FRESULT fatres = f_chdrive("0:");
+    if (fatres != FR_OK)
+        return false; // Need to be able to access the drive
+
+    fatres = f_chdir("/");
+    if (fatres != FR_OK)
+        return false; // need to at least be able to access the root directory
+    uint8_t month, day;
+    uint16_t year;
+    Rp2040_rtc::instance().get_date(year, month, day);
+    sprintf(dirname, "%02u-%02u-%04u", month, day, year);
+    FRESULT res = f_chdir(base_preset_path);
+    if (res == FR_NO_PATH)
+        return true; // no backup has ever been done, so the dirname is correct
+    else if (res != FR_OK) {
+        return false; // the directory exists, but changing into it failed
+    }
+    DIR dir;
+    uint8_t version = 1;
+    while(res == FR_OK && version > 0) {
+        res = f_opendir(&dir, dirname);
+        if (res == FR_OK) {
+            res = f_closedir(&dir);
+            // need enough space for 4 more characters
+            if (res == FR_OK) {
+                if (maxname > 14) // 10 characters for the date, 1 for a dash, maximum of 3 for version, plus Null terminator
+                    sprintf(dirname+10, "-%u", version++); // version will wrap around if there are 256 backups on the same date
+                else
+                    return false; // not enough space for the filename
+            }
+        }
+    }
+    return (version != 0) && res == FR_NO_PATH;
+}
+
+FRESULT rppicomidi::Settings_file::backup_all_presets()
+{
+    FRESULT fatres = f_chdrive("0:");
+    if (fatres != FR_OK)
+        return fatres;
+    fatres = f_chdir("/");
     if (fatres != FR_OK)
         return fatres;
     lfs_dir_t dir;
@@ -222,6 +271,7 @@ FRESULT rppicomidi::Settings_file::backup_presets()
     while (true) {
         int res = lfs_dir_read(&dir, &info);
         if (res < 0) {
+            lfs_dir_close(&dir);
             pico_unmount();
             return FR_INT_ERR;
         }
@@ -230,29 +280,42 @@ FRESULT rppicomidi::Settings_file::backup_presets()
             break;
         }
         // There is at least one settings file. Make sure there is a directory to store it in.
+        // Presets are stored in 0:/rppicomidi-pico-usb-midi-processor/date[-version for that date]
         if (!flash_file_directory_ok) {
-            uint8_t month, day;
-            uint16_t year;
-            Rp2040_rtc::instance().get_date(year, month, day);
-            sprintf(dirname, "/%02u-%02u-%04u", month, day, year);
-            fatres = f_mkdir(dirname);
-            uint16_t rev=1;
-            while (fatres == FR_EXIST) {
-                sprintf(&dirname[strlen(dirname)],"-%u", rev++);
-                fatres = f_mkdir(dirname);
+            if (!get_next_backup_directory_name(dirname, sizeof(dirname))) {
+                lfs_dir_close(&dir);
+                pico_unmount();
+                return FR_INT_ERR;
             }
+            fatres = f_chdir(base_preset_path);
+            if (fatres == FR_NO_PATH) {
+                fatres = f_mkdir(base_preset_path);
+                if (fatres != FR_OK) {
+                    lfs_dir_close(&dir);
+                    pico_unmount();
+                    return fatres;
+                }
+            }
+            fatres = f_chdir(base_preset_path);
+            if (fatres != FR_OK) {
+                lfs_dir_close(&dir);
+                pico_unmount();
+                return fatres;
+            }
+
+            fatres = f_mkdir(dirname);
+            if (fatres != FR_OK) {
+                lfs_dir_close(&dir);
+                pico_unmount();
+                return fatres;
+            }
+            fatres = f_chdir(dirname);
             if (fatres != FR_OK) {
                 lfs_dir_close(&dir);
                 pico_unmount();
                 return fatres;
             }
             flash_file_directory_ok = true;
-        }
-        fatres = f_chdir(dirname);
-        if (fatres != FR_OK) {
-            lfs_dir_close(&dir);
-            pico_unmount();
-            return fatres;
         }
         char* raw_settings;
         if(info.type == LFS_TYPE_REG) {
@@ -274,7 +337,7 @@ FRESULT rppicomidi::Settings_file::backup_presets()
                     pico_unmount();
                     return fatres;
                 }
-                printf("backed up preset %s\r\n", info.name);
+                printf("backed up preset 0:%s/%s/%s\r\n", base_preset_path, dirname, info.name);
             }
             else {
                 delete[] raw_settings;
@@ -293,6 +356,138 @@ FRESULT rppicomidi::Settings_file::backup_presets()
     pico_unmount();
     return FR_OK;
 }
+FRESULT rppicomidi::Settings_file::restore_one_file(char* fullpath, char* filename)
+{
+    printf("Restoring %s\r\n", filename);
+    FIL file;
+    FRESULT fatres = f_open(&file, fullpath, FA_READ);
+    if (fatres != FR_OK) {
+        printf("error %u opening file %s\r\n", fatres, fullpath);
+        return fatres;
+    }
+    UINT filesize = f_size(&file);
+    char* buffer = new char[filesize];
+    UINT bytes_read;
+    fatres = f_read(&file, buffer, filesize, &bytes_read);
+    f_close(&file);
+    if (fatres != FR_OK) {
+        printf("error %u reading file %s\r\n", fatres, fullpath);
+        return fatres;
+    }
+    int error_code = pico_mount(false);
+    if (error_code != 0) {
+        free((void*)buffer);
+        printf("unexpected error %s mounting flash\r\n", pico_errmsg(error_code));
+        return FR_INT_ERR;
+    }
+    printf("opening file %s for read only\r\n", filename);
+    int localfile = pico_open(filename, LFS_O_RDONLY);
+    if (localfile < 0) {
+        // file does not exist
+        printf("opening/creating file %s for read/write\r\n", filename);
+        localfile = pico_open(filename, LFS_O_WRONLY | LFS_O_CREAT);
+        if (localfile < 0) {
+            printf("error %s creating %s for writing\r\n", pico_errmsg(localfile), filename);
+            free((void*)buffer);
+            pico_unmount();
+            return FR_INT_ERR;
+        }
+    }
+    else {
+        // file exists. Truncate it to 0 length in preparation for new data
+        error_code = pico_close(localfile);
+        if (error_code != LFS_ERR_OK) {
+            printf("error %s closing %s\r\n", pico_errmsg(error_code), filename);
+            free((void*)buffer);
+            pico_unmount();
+            return FR_INT_ERR;
+        }
+
+        localfile = pico_open(filename, LFS_O_WRONLY);
+        if (localfile < 0) {
+            printf("error %s opening %s for writing\r\n", pico_errmsg(localfile), filename);
+            free((void*)buffer);
+            pico_unmount();
+            return FR_INT_ERR;
+        }
+    }
+    printf("writing settings to file %s\r\n", filename);
+    // file is open for writing; write the settings
+    error_code = pico_write(localfile, buffer, strlen(buffer)+1);
+
+    free(buffer);
+    pico_close(localfile);
+    pico_unmount();
+    if (error_code < 0) {
+        printf("error %s writing settings to file\r\n", pico_errmsg(error_code));
+        return FR_INT_ERR;
+    }
+    else if ((size_t)error_code < strlen(buffer)) {
+        printf("store: Only %d bytes stored out of %u\r\n", error_code, strlen(buffer));
+        // hmm. no idea why that should happen
+        return FR_INT_ERR;
+    }
+    return FR_OK;
+}
+
+FRESULT rppicomidi::Settings_file::restore_presets(char* backup_path)
+{
+    FRESULT fatres = f_chdrive("0:");
+    if (fatres != FR_OK)
+        return fatres;
+    if (strlen(backup_path) >= strlen(".json")) {
+        char* ptr = strstr(backup_path, ".json");
+        if (ptr != nullptr && strlen(ptr) == strlen(".json")) {
+            // should be a single file
+            if ((ptr - 9) >= backup_path && *ptr-10 == '/') {
+                char fullpath[strlen(base_preset_path) + 1 + strlen(backup_path)]; // need space for base_preset path '/' backup_path
+                strcpy(fullpath, base_preset_path);
+                strcat(fullpath, "/");
+                strcat(fullpath, backup_path);
+                char* filename = strstr(fullpath, ".json") - 9;
+                fatres = restore_one_file(backup_path, filename);
+            }
+        }
+        else {
+            // need to restore every file in the directory
+            char fullpath[strlen(base_preset_path) + 1 + strlen(backup_path)+16]; // need space for base_preset path '/' backup_path + /xxxx-yyyy.json
+            char* filename = fullpath + strlen(base_preset_path) + strlen(backup_path) + 2; // +2 is for the two '/' characters
+            strcpy(fullpath, base_preset_path);
+            strcat(fullpath, "/");
+            strcat(fullpath, backup_path);
+            DIR dir;
+            fatres = f_opendir(&dir, fullpath);
+            if (fatres == FR_OK) {
+                FILINFO info;
+                strcat(fullpath, "/");
+                fatres = f_readdir(&dir, &info);
+                while (fatres == FR_OK && info.fname[0] != 0) {
+                    strncpy(filename, info.fname, 16);
+                    filename[15] = '\0';
+                    if (strncmp(filename+9, ".json", 5) != 0) {
+                        // filename is not formed correctly
+                        fatres = FR_NO_FILE;
+                    }
+                    else {
+                        fatres = restore_one_file(fullpath, filename);
+                        if (fatres == FR_OK) {
+                            fatres = f_readdir(&dir, &info);
+                        }
+                        else {
+                            printf("error %u restoring file %s\r\n", fatres, filename);
+                        }
+                    }
+                }
+                f_closedir(&dir);
+            }
+            else {
+                printf("error opening directory %s\r\n", fullpath);
+            }
+        }
+    }
+    return fatres;
+}
+
 bool rppicomidi::Settings_file::load_preset(uint8_t next_preset)
 {
     char* raw_settings = NULL;
@@ -509,7 +704,7 @@ void rppicomidi::Settings_file::static_list_files(EmbeddedCli* cli, char* args, 
     }
 }
 
-static void print_fat_date(WORD wdate)
+void rppicomidi::Settings_file::print_fat_date(WORD wdate)
 {
     uint16_t year = 1980 + ((wdate >> 9) & 0x7f);
     uint16_t month = (wdate >> 5) & 0xf;
@@ -517,7 +712,7 @@ static void print_fat_date(WORD wdate)
     printf("%02u/%02u/%04u\t", month, day, year);
 }
 
-static void print_fat_time(WORD wtime)
+void rppicomidi::Settings_file::print_fat_time(WORD wtime)
 {
     uint8_t hour = ((wtime >> 11) & 0x1f);
     uint8_t min = ((wtime >> 5) & 0x3F);
@@ -525,11 +720,10 @@ static void print_fat_time(WORD wtime)
     printf("%02u:%02u:%02u\t", hour, min, sec);
 }
 
-static FRESULT scan_files(const char* path)
+FRESULT rppicomidi::Settings_file::scan_files(const char* path)
 {
     FRESULT res;
     DIR dir;
-    //UINT i;
     static FILINFO fno;
 
     res = f_opendir(&dir, path);                       /* Open the directory */
@@ -537,17 +731,6 @@ static FRESULT scan_files(const char* path)
         for (;;) {
             res = f_readdir(&dir, &fno);                   /* Read a directory item */
             if (res != FR_OK || fno.fname[0] == 0) break;  /* Break on error or end of dir */
-            #if 0 // Do not do recursive scan.
-            if (fno.fattrib & AM_DIR) {                    /* It is a directory */
-                i = strlen(path);
-                sprintf(&path[i], "/%s", fno.fname);
-                res = scan_files(path);                    /* Enter the directory */
-                if (res != FR_OK) break;
-                path[i] = 0;
-            } else {                                       /* It is a file. */
-                printf("%s/%s\r\n", path, fno.fname);
-            }
-            #endif
             printf("%lu\t",fno.fsize);
             print_fat_date(fno.fdate);
             print_fat_time(fno.ftime);
@@ -564,7 +747,7 @@ void rppicomidi::Settings_file::static_fatfs_ls(EmbeddedCli *cli, char *args, vo
     (void)cli;
     (void)args;
     (void)context;
-    FRESULT res = scan_files(".");
+    FRESULT res = instance().scan_files(".");
     if (res != FR_OK) {
         printf("Error %u listing files on drive\r\n", res);
     }
@@ -575,9 +758,28 @@ void rppicomidi::Settings_file::static_fatfs_backup(EmbeddedCli *cli, char *args
     (void)cli;
     (void)args;
     (void)context;
-    FRESULT res = instance().backup_presets();
+    FRESULT res = instance().backup_all_presets();
     if (res != FR_OK) {
         printf("Error %u backing up files on drive\r\n", res);
+    }
+}
+
+void rppicomidi::Settings_file::static_fatfs_restore(EmbeddedCli* cli, char* args, void*)
+{
+    (void)cli;
+    uint16_t argc = embeddedCliGetTokenCount(args);
+    FRESULT res;
+    char path[256];
+    if (argc == 1) {
+        strncpy(path, embeddedCliGetToken(args, 1), sizeof(path)-1);
+        res = Settings_file::instance().restore_presets(path);
+    }
+    else {
+        printf("usage: fatcd <new path>\r\n");
+        return;
+    }
+    if (res != FR_OK) {
+        printf("error %u restoring presets from %s\r\n", res, path);
     }
 }
 

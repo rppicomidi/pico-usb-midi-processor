@@ -33,6 +33,7 @@
 #pragma once
 #include <cstdint>
 #include <string>
+#include <vector>
 #include "littlefs-lib/pico_hal.h"
 #include "embedded_cli.h"
 #include "ff.h"
@@ -128,12 +129,36 @@ public:
     }
 
     /**
-     * @brief copy all presets in the local file system to external flash drive
+     * @brief copy all presets of all devices stored in the local file system
+     * to external flash drive
      * 
      * The presets will be stored in a directory named MM-DD-YYYY-HH-MM-SS
      * @return FR_OK if no error, an error code otherwise 
      */
-    FRESULT backup_presets();
+    FRESULT backup_all_presets();
+
+    /**
+     * @brief copy preset(s) specified in the backup path to local storage
+     * 
+     * @param backup_path if restoring all presets backed up, the backup_path
+     * will be a string of the form returned by get_next_backup_directory_name().
+     * If restoring a all presets for a single device preset, it will be in
+     * the form of a directory name as return by 
+     * get_next_backup_directory_name()+"/"+"vid-pid.json"
+     * @return FRESULT 
+     */
+    FRESULT restore_presets(char* backup_path);
+
+    /**
+     * @brief Get the next backup directory name
+     * 
+     * @param dirname the character buffer where the next directory name is stored
+     * @param maxname the length of the dirname buffer
+     * @return true if a valid backup directory name is in dirname, false otherwise
+     */
+    bool get_next_backup_directory_name(char* dirname, size_t maxname);
+
+    bool get_all_preset_directory_names(std::vector<std::string> dirname_list);
 private:
     Settings_file();
 
@@ -147,6 +172,8 @@ private:
     int load_settings_string(char** raw_settings_ptr);
 
     int load_settings_string(const char* fn, char** raw_settings_ptr, bool mount=true);
+
+    FRESULT restore_one_file(char* backup_path, char* filename);
     /**
      * @brief See https://github.com/littlefs-project/littlefs/issues/2
      * 
@@ -164,8 +191,13 @@ private:
     static void static_fatfs_cd(EmbeddedCli* cli, char* args, void*);
     static void static_fatfs_ls(EmbeddedCli* cli, char* args, void*);
     static void static_fatfs_backup(EmbeddedCli* cli, char* args, void*);
-
+    static void static_fatfs_restore(EmbeddedCli* cli, char* args, void*);
+    FRESULT scan_files(const char* path);
+    void print_fat_time(WORD wtime);
+    void print_fat_date(WORD wtime);
+    FRESULT create_preset_backup_directory(char* dirname);
     uint16_t vid;       // the idVendor of the connected device (not serialized here)
     uint16_t pid;       // the idProduct of the connected device (not serialized here)
+    static constexpr const char* base_preset_path = "/rppicomidi-pico-usb-midi-processor";
 };
 }

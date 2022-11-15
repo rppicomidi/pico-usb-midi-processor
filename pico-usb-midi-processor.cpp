@@ -328,7 +328,16 @@ int main()
     multicore_launch_core1(core1_main);
 
     // Initialize the CLI
-    EmbeddedCli *cli = embeddedCliNewDefault();
+    EmbeddedCliConfig cli_config = {
+        .rxBufferSize = 64,
+        .cmdBufferSize = 64,
+        .historyBufferSize = 128,
+        .maxBindingCount = 10,
+        .cliBuffer = NULL,
+        .cliBufferSize = 0,
+        .enableAutoComplete = true,
+    };
+    EmbeddedCli *cli = embeddedCliNew(&cli_config);
     cli->onCommand = onCommandFn;
     cli->writeChar = writeCharFn;
     // initialize the Pico_usb_midi_processor object instance and the associated CLI

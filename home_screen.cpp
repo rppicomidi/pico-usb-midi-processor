@@ -29,6 +29,7 @@
 #include <cstring>
 #include <cstdio>
 #include "home_screen.h"
+#include "backup_view.h"
 
 rppicomidi::Home_screen::Home_screen(Mono_graphics& screen_, const char* device_label_) :
     View{screen_, screen_.get_clip_rect()},
@@ -111,17 +112,17 @@ void rppicomidi::Home_screen::set_connected_device(const char* device_label_, ui
     is_preset_backup_mode = false;
     if (num_in_cables !=0 || num_out_cables !=0) {
         preset_view = new Preset_view(screen, screen.get_clip_rect());
-        auto preset_item = new View_launch_menu_item(*preset_view, "Presets", screen, label_font);
+        auto preset_item = new View_launch_menu_item(*preset_view, "Presets...", screen, label_font);
         menu.add_menu_item(preset_item);
         for (int port=0; port<num_in_cables; port++) {
             char line[max_line_length+1];
-            sprintf(line,"Setup MIDI IN %u", port+1);
+            sprintf(line,"Setup MIDI IN %u...", port+1);
             Menu_item* item = new View_launch_menu_item(*midi_in_setup.at(port),line, screen, label_font);
             menu.add_menu_item(item);
         }
         for (int port=0; port<num_out_cables; port++) {
             char line[max_line_length+1];
-            sprintf(line,"Setup MIDI OUT %u", port+1);
+            sprintf(line,"Setup MIDI OUT %u...", port+1);
             Menu_item* item = new View_launch_menu_item(*midi_out_setup.at(port),line, screen, label_font);
             menu.add_menu_item(item);
         }
@@ -131,21 +132,16 @@ void rppicomidi::Home_screen::set_connected_device(const char* device_label_, ui
     }
 }
 
-static void backup_cb(rppicomidi::View* context)
-{
-    (void)context;
-    rppicomidi::Settings_file::instance().backup_presets();
-}
-
 void rppicomidi::Home_screen::enter_preset_backup_mode(View& timeset_view)
 {
     is_preset_backup_mode = true;
     strncpy(device_label, "Save/Restore Presets to Flash Drive", max_device_label);
     device_label[max_device_label] = '\0';
-    Menu_item* item = new View_launch_menu_item(timeset_view, "Set Date/Time", screen, label_font);
+    Menu_item* item = new View_launch_menu_item(timeset_view, "Set Date/Time...", screen, label_font);
     assert(item);
     menu.add_menu_item(item);
-    item = new Callback_menu_item("Backup all", screen, label_font, nullptr, backup_cb);
+    auto backup = new Backup_view(screen);
+    item = new View_launch_menu_item(*backup,"Backup...",screen, label_font);
     assert(item);
     menu.add_menu_item(item);
     menu.entry();

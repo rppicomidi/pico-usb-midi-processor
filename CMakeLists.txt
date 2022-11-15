@@ -37,6 +37,8 @@ target_sources(${target_name} PRIVATE
  midi_processor_chan_mes_remap_settings_view.cpp
  preset_view.cpp
  clock_set_view.cpp
+ backup_view.cpp
+ restore_view.cpp
  ${PICO_PIO_USB_SRC}/pio_usb.c
  ${PICO_PIO_USB_SRC}/pio_usb_device.c
  ${PICO_PIO_USB_SRC}/pio_usb_host.c
