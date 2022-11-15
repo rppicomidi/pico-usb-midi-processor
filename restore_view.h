@@ -24,8 +24,11 @@
  * SOFTWARE.
  */
 #pragma once
+#include <string>
+#include <vector>
 #include "menu.h"
 #include "callback_menu_item.h"
+#include "text_item_chooser_menu.h"
 namespace rppicomidi
 {
 class Restore_view : public View
@@ -34,10 +37,20 @@ public:
     Restore_view()=delete;
     virtual ~Restore_view() = default;
     Restore_view(Mono_graphics& screen_);
+    void entry() final;
+    void exit() final;
+    void draw() final;
+    Select_result on_select(View** new_view) final {return current_menu->on_select(new_view);}
+    void on_increment(uint32_t delta, bool is_shifted) final {current_menu->on_increment(delta, is_shifted); };
+    void on_decrement(uint32_t delta, bool is_shifted) final {current_menu->on_decrement(delta, is_shifted); };
 private:
+    static void dir_select_callback(View* context, View**);
+    static void file_select_callback(View* context, View**);
     const Mono_mono_font& font;
     Menu menu;
-    void entry() final;
-    void draw() final;
+    Menu dir_chooser_menu;
+    Menu* current_menu;
+    std::vector<std::string> filenames;
+    static constexpr const char* all_files_str="All files";
 };
 }

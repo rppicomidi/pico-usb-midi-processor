@@ -30,6 +30,7 @@
 #include <cstdio>
 #include "home_screen.h"
 #include "backup_view.h"
+#include "restore_view.h"
 
 rppicomidi::Home_screen::Home_screen(Mono_graphics& screen_, const char* device_label_) :
     View{screen_, screen_.get_clip_rect()},
@@ -142,6 +143,10 @@ void rppicomidi::Home_screen::enter_preset_backup_mode(View& timeset_view)
     menu.add_menu_item(item);
     auto backup = new Backup_view(screen);
     item = new View_launch_menu_item(*backup,"Backup...",screen, label_font);
+    assert(item);
+    menu.add_menu_item(item);
+    auto restore = new Restore_view(screen);
+    item = new View_launch_menu_item(*restore,"Restore...",screen, label_font);
     assert(item);
     menu.add_menu_item(item);
     menu.entry();

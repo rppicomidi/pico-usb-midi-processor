@@ -147,7 +147,7 @@ public:
      * get_next_backup_directory_name()+"/"+"vid-pid.json"
      * @return FRESULT 
      */
-    FRESULT restore_presets(char* backup_path);
+    FRESULT restore_presets(const char* backup_path);
 
     /**
      * @brief Get the next backup directory name
@@ -158,7 +158,8 @@ public:
      */
     bool get_next_backup_directory_name(char* dirname, size_t maxname);
 
-    bool get_all_preset_directory_names(std::vector<std::string> dirname_list);
+    bool get_all_preset_directory_names(std::vector<std::string>& dirname_list);
+    bool get_all_preset_filenames(const char* directory_name, std::vector<std::string>& filename_list);
 private:
     Settings_file();
 
@@ -173,7 +174,7 @@ private:
 
     int load_settings_string(const char* fn, char** raw_settings_ptr, bool mount=true);
 
-    FRESULT restore_one_file(char* backup_path, char* filename);
+    FRESULT restore_one_file(const char* backup_path, const char* filename);
     /**
      * @brief See https://github.com/littlefs-project/littlefs/issues/2
      * 

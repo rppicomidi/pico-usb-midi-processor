@@ -356,7 +356,7 @@ FRESULT rppicomidi::Settings_file::backup_all_presets()
     pico_unmount();
     return FR_OK;
 }
-FRESULT rppicomidi::Settings_file::restore_one_file(char* fullpath, char* filename)
+FRESULT rppicomidi::Settings_file::restore_one_file(const char* fullpath, const char* filename)
 {
     printf("Restoring %s\r\n", filename);
     FIL file;
@@ -430,7 +430,7 @@ FRESULT rppicomidi::Settings_file::restore_one_file(char* fullpath, char* filena
     return FR_OK;
 }
 
-FRESULT rppicomidi::Settings_file::restore_presets(char* backup_path)
+FRESULT rppicomidi::Settings_file::restore_presets(const char* backup_path)
 {
     FRESULT fatres = f_chdrive("0:");
     if (fatres != FR_OK)
@@ -439,13 +439,17 @@ FRESULT rppicomidi::Settings_file::restore_presets(char* backup_path)
         char* ptr = strstr(backup_path, ".json");
         if (ptr != nullptr && strlen(ptr) == strlen(".json")) {
             // should be a single file
-            if ((ptr - 9) >= backup_path && *ptr-10 == '/') {
-                char fullpath[strlen(base_preset_path) + 1 + strlen(backup_path)]; // need space for base_preset path '/' backup_path
-                strcpy(fullpath, base_preset_path);
-                strcat(fullpath, "/");
-                strcat(fullpath, backup_path);
-                char* filename = strstr(fullpath, ".json") - 9;
-                fatres = restore_one_file(backup_path, filename);
+            char fullpath[strlen(base_preset_path) + 1 + strlen(backup_path)]; // need space for base_preset path '/' backup_path
+            strcpy(fullpath, base_preset_path);
+            strcat(fullpath, "/");
+            strcat(fullpath, backup_path);
+            char* filename = strstr(fullpath, ".json") - 9;
+            if ((ptr - 9) >= backup_path && *(ptr-10) == '/') {
+                fatres = restore_one_file(fullpath, filename);
+            }
+            else {
+                printf("poorly formed backup_path=%s\r\n", backup_path);
+                fatres = FR_INVALID_PARAMETER;
             }
         }
         else {
@@ -485,7 +489,54 @@ FRESULT rppicomidi::Settings_file::restore_presets(char* backup_path)
             }
         }
     }
+    else {
+        fatres = FR_INVALID_PARAMETER;
+    }
     return fatres;
+}
+
+bool rppicomidi::Settings_file::get_all_preset_directory_names(std::vector<std::string>& dirname_list)
+{
+    FRESULT fatres = f_chdrive("0:");
+    if (fatres != FR_OK)
+        return false;
+    DIR dir;
+    fatres = f_opendir(&dir,  base_preset_path);
+    if (fatres != FR_OK) {
+        return false;
+    }
+    FILINFO info;
+    fatres = f_readdir(&dir, &info);
+    while (fatres == FR_OK && info.fname[0] != 0) {
+        if (info.fattrib & AM_DIR) {
+            dirname_list.push_back(std::string(info.fname));
+        }
+        fatres = f_readdir(&dir, &info);
+    }
+    return fatres == FR_OK;
+}
+
+bool rppicomidi::Settings_file::get_all_preset_filenames(const char* directory_name, std::vector<std::string>& filename_list)
+{
+    FRESULT fatres = f_chdrive("0:");
+    if (fatres != FR_OK)
+        return false;
+    fatres = f_chdir(base_preset_path);
+    if (fatres != FR_OK)
+        return false;
+    DIR dir;
+    fatres = f_opendir(&dir, directory_name);
+    if (fatres != FR_OK) {
+        return false;
+    }
+    FILINFO info;
+    fatres = f_readdir(&dir, &info);
+    while (fatres == FR_OK && info.fname[0] != 0) {
+        if ((info.fattrib & AM_DIR) == 0)
+            filename_list.push_back(std::string(info.fname));
+        fatres = f_readdir(&dir, &info);
+    }
+    return fatres == FR_OK;
 }
 
 bool rppicomidi::Settings_file::load_preset(uint8_t next_preset)
@@ -595,7 +646,6 @@ int rppicomidi::Settings_file::store()
     }
     return LFS_ERR_OK;
 }
-
 
 int rppicomidi::Settings_file::lfs_ls(const char *path)
 {
