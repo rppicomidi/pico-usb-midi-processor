@@ -51,8 +51,9 @@ void rppicomidi::Backup_view::draw()
         menu.draw();
     }
     else {
-        screen.center_string(font, "Backup Folder Failed", 0);
-        return;
+        // clear the top line
+        screen.draw_rectangle(0, 0, screen.get_screen_width(),font.height,Pixel_state::PIXEL_ZERO, Pixel_state::PIXEL_ZERO);
+        screen.center_string(font, "Backup Failed", 0);
     }
 }
 
