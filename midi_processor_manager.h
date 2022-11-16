@@ -295,6 +295,8 @@ public:
         return result;
     }
     void clear_all_processors();
+
+    bool get_product_string_from_setting_data(char* json_format, char* product_string, size_t max_string);
 private:
     /**
      * @brief Construct a new Midi_processor_manager object

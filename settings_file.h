@@ -162,15 +162,16 @@ public:
     bool get_all_preset_filenames(const char* directory_name, std::vector<std::string>& filename_list);
 
     /**
-     * @brief Read the product string
-     *
+     * @brief Get the setting file json string object
+     * 
      * @param directory The backup directory under base_preset_path
      * @param filename The file name of the file under the backup directory
-     * @param prod_string a pointer to storage large enough to hold the product string
-     * @param max_string the maximum number of bytes in the string including the null character
-     * @return true if the product string was read, false otherwise
+     * @param json_string pointer to the pointer to JSON-formatted data read from the file or
+     * nullptr if the function fails. The user of this function must call delete[] to free
+     * json_string when it is no longer needed.
+     * @return true if json_string contains valid data, false otherwise
      */
-    bool get_setting_file_product_string(const char* directory, const char* file, char* prod_string, size_t max_string);
+    bool get_setting_file_json_string(const char* directory, const char* file, char** json_string);
 private:
     Settings_file();
 

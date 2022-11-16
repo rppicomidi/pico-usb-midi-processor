@@ -532,3 +532,32 @@ bool rppicomidi::Midi_processor_manager::deserialize(char* json_format)
         dirty = false;
     return result;
 }
+
+bool rppicomidi::Midi_processor_manager::get_product_string_from_setting_data(char* json_format, char* product_string, size_t max_string)
+{
+    JSON_Value* root_value= json_parse_string(json_format);
+    JSON_Object *root_object = NULL;
+    bool result = false;
+    if (root_value && json_value_get_type(root_value) == JSONObject) {
+        root_object = json_value_get_object(root_value);
+        if (json_object_has_value_of_type(root_object, "prod", JSONString)) {
+            size_t len = json_object_get_string_len(root_object, "prod");
+            if (len < max_string) {
+                const char* prod = json_object_get_string(root_object, "prod");
+                if (prod) {
+                    strncpy(product_string, prod, max_string);
+                    result = true;
+                }
+                else {
+                    printf("error retrieving product string from JSON data\r\n");
+                }
+            }
+        }
+        else {
+            printf("Could not parse product string from settings\r\n");
+        }
+    }
+    if (root_value)
+        json_value_free(root_value);
+    return result;
+}
