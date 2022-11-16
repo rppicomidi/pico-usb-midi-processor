@@ -24,6 +24,7 @@
 #include "settings_file.h"
 #include "midi_processor_manager.h"
 #include "rp2040_rtc.h"
+#include "parson.h"
 rppicomidi::Settings_file::Settings_file() : vid{0}, pid{0}
 {
     // Make sure the flash filesystem is working
@@ -428,6 +429,60 @@ FRESULT rppicomidi::Settings_file::restore_one_file(const char* fullpath, const 
         return FR_INT_ERR;
     }
     return FR_OK;
+}
+
+bool rppicomidi::Settings_file::get_setting_file_product_string(const char* directory, const char* filename, char* prod_string, size_t max_string)
+{
+    FIL file;
+    char restore_path[256];
+    size_t max_path = sizeof(restore_path)-1;
+    strncpy(restore_path, base_preset_path, max_path);
+    strncat(restore_path, "/", max_path);
+    strncat(restore_path, directory, max_path);
+    strncat(restore_path, "/", max_path);
+    strncat(restore_path, filename, max_path);
+    restore_path[max_path] = '\0';
+    FRESULT fatres = f_open(&file, restore_path, FA_READ);
+    if (fatres != FR_OK) {
+        printf("error %u opening file %s\r\n", fatres, restore_path);
+        return false;
+    }
+    UINT filesize = f_size(&file);
+    char* buffer = new char[filesize];
+    UINT bytes_read;
+    fatres = f_read(&file, buffer, filesize, &bytes_read);
+    f_close(&file);
+    if (fatres != FR_OK) {
+        printf("error %u reading file %s\r\n", fatres, restore_path);
+        delete[] buffer;
+        return false;
+    }
+    JSON_Value* root_value= json_parse_string(buffer);
+    JSON_Object *root_object = NULL;
+    delete[] buffer;
+    bool result = false;
+    if (root_value && json_value_get_type(root_value) == JSONObject) {
+        root_object = json_value_get_object(root_value);
+        if (json_object_has_value_of_type(root_object, "prod", JSONString)) {
+            size_t len = json_object_get_string_len(root_object, "prod");
+            if (len < max_string) {
+                const char* prod = json_object_get_string(root_object, "prod");
+                if (prod) {
+                    strncpy(prod_string, prod, max_string);
+                    result = true;
+                }
+                else {
+                    printf("error retrieving product string from JSON data\r\n");
+                }
+            }
+        }
+        else {
+            printf("Could not parse product string from settings\r\n");
+        }
+    }
+    if (root_value)
+        json_value_free(root_value);
+    return result;
 }
 
 FRESULT rppicomidi::Settings_file::restore_presets(const char* backup_path)

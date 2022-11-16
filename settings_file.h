@@ -160,6 +160,17 @@ public:
 
     bool get_all_preset_directory_names(std::vector<std::string>& dirname_list);
     bool get_all_preset_filenames(const char* directory_name, std::vector<std::string>& filename_list);
+
+    /**
+     * @brief Read the product string
+     *
+     * @param directory The backup directory under base_preset_path
+     * @param filename The file name of the file under the backup directory
+     * @param prod_string a pointer to storage large enough to hold the product string
+     * @param max_string the maximum number of bytes in the string including the null character
+     * @return true if the product string was read, false otherwise
+     */
+    bool get_setting_file_product_string(const char* directory, const char* file, char* prod_string, size_t max_string);
 private:
     Settings_file();
 
@@ -174,7 +185,8 @@ private:
 
     int load_settings_string(const char* fn, char** raw_settings_ptr, bool mount=true);
 
-    FRESULT restore_one_file(const char* backup_path, const char* filename);
+    FRESULT restore_one_file(const char* restore_path, const char* filename);
+
     /**
      * @brief See https://github.com/littlefs-project/littlefs/issues/2
      * 

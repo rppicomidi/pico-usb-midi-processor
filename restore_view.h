@@ -41,16 +41,18 @@ public:
     void exit() final;
     void draw() final;
     Select_result on_select(View** new_view) final {return current_menu->on_select(new_view);}
-    void on_increment(uint32_t delta, bool is_shifted) final {current_menu->on_increment(delta, is_shifted); };
-    void on_decrement(uint32_t delta, bool is_shifted) final {current_menu->on_decrement(delta, is_shifted); };
+    void on_increment(uint32_t delta, bool is_shifted) final;
+    void on_decrement(uint32_t delta, bool is_shifted) final;
 private:
     static void dir_select_callback(View* context, View**);
     static void file_select_callback(View* context, View**);
+    void update_product_string_display();
     const Mono_mono_font& font;
     Menu menu;
     Menu dir_chooser_menu;
     Menu* current_menu;
     std::vector<std::string> filenames;
     static constexpr const char* all_files_str="All files";
+    static const uint8_t max_line_length = 21;
 };
 }
