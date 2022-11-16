@@ -108,8 +108,8 @@ void rppicomidi::Restore_view::update_product_string_display()
     if (current_menu == &dir_chooser_menu) {
         // update the device name display at the top of the screen
         char prod_string[max_line_length*2+1];
-        screen.draw_rectangle(0, 0, screen.get_screen_width(), 2*font.height,Pixel_state::PIXEL_ZERO, Pixel_state::PIXEL_ZERO);
         if (dir_chooser_menu.get_current_item_idx() == 0) {
+            screen.draw_rectangle(0, 0, screen.get_screen_width(), 2*font.height,Pixel_state::PIXEL_ZERO, Pixel_state::PIXEL_ZERO);
             screen.center_string(font, "Restore presets", font.height);
         }
         else {
@@ -122,46 +122,7 @@ void rppicomidi::Restore_view::update_product_string_display()
                     return;
                 }
                 delete[] json_format;
-                size_t device_label_len = strlen(prod_string);
-                if (device_label_len <= max_line_length) {
-                    // Center the Produce String on the 2nd line of the screen
-                    screen.center_string(font, prod_string, font.height);
-                }
-                else {
-                    // Break the device_label string into two lines.
-                    char line1[max_line_length+1];
-                    char line2[max_line_length+1];
-                    // Copy as much of the text onto the first line as possible and copy the remaining
-                    // text to the next line
-                    strncpy(line1, prod_string, max_line_length);
-                    line1[max_line_length] = '\0';
-                    strncpy(line2, prod_string+max_line_length, max_line_length);
-                    line2[max_line_length] = '\0';
-
-                    // See if we can break the text at a space
-                    char* ptr = strrchr(line1, ' ');
-                    bool center = false;
-                    if (ptr != nullptr) {
-                        // Found the last space
-                        char* remaining_text = prod_string + (ptr - line1 + 1);
-                        if (strlen(remaining_text) <= max_line_length) {
-                            // Terminate line 1 at the last space
-                            *ptr = '\0';
-                            // copy the remaining text to line 2
-                            strncpy(line2, remaining_text, max_line_length);
-                            line2[max_line_length] = '\0';
-                            center = true; // center both lines of text for a cleaner look
-                        }
-                    }
-                    if (center) {
-                        screen.center_string(font, line1, 0);
-                        screen.center_string(font, line2, font.height);
-                    }
-                    else {
-                        screen.draw_string(font, 0, 0, line1, strlen(line1), Pixel_state::PIXEL_ONE, Pixel_state::PIXEL_ZERO);
-                        screen.draw_string(font, 0, font.height, line2, strlen(line2), Pixel_state::PIXEL_ONE, Pixel_state::PIXEL_ZERO);
-                    }
-                }
+                screen.center_string_on_two_lines(font, prod_string, 0);
             }
         }
     }

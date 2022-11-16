@@ -39,53 +39,17 @@ rppicomidi::Home_screen::Home_screen(Mono_graphics& screen_, const char* device_
     num_in_cables{0}, num_out_cables{0}, is_preset_backup_mode{false}
 {
     set_connected_device(device_label_, num_in_cables, num_out_cables);
+    auto item = new Menu_item("Settings Flash...", screen, label_font);
+    assert(item);
+    menu.add_menu_item(item);
 }
 
 
 void rppicomidi::Home_screen::draw()
 {
     screen.clear_canvas();
-    auto device_label_len = strlen(device_label);
-    if (device_label_len <= max_line_length) {
-        // Center the Produce String on the 2nd line of the screen
-        screen.center_string(label_font, device_label, label_font.height);
-    }
-    else {
-        // Break the device_label string into two lines.
-        char line1[max_line_length+1];
-        char line2[max_line_length+1];
-        // Copy as much of the text onto the first line as possible and copy the remaining
-        // text to the next line
-        strncpy(line1, device_label, max_line_length);
-        line1[max_line_length] = '\0';
-        strncpy(line2, device_label+max_line_length, max_line_length);
-        line2[max_line_length] = '\0';
-
-        // See if we can break the text at a space
-        char* ptr = strrchr(line1, ' ');
-        bool center = false;
-        if (ptr != nullptr) {
-            // Found the last space
-            char* remaining_text = device_label + (ptr - line1 + 1);
-            if (strlen(remaining_text) <= max_line_length) {
-                // Terminate line 1 at the last space
-                *ptr = '\0';
-                // copy the remaining text to line 2
-                strncpy(line2, remaining_text, max_line_length);
-                line2[max_line_length] = '\0';
-                center = true; // center both lines of text for a cleaner look
-            }                
-        }
-        if (center) {
-            screen.center_string(label_font, line1, 0);
-            screen.center_string(label_font, line2, label_font.height);
-        }
-        else {
-            screen.draw_string(label_font, 0, 0, line1, strlen(line1), Pixel_state::PIXEL_ONE, Pixel_state::PIXEL_ZERO);
-            screen.draw_string(label_font, 0, label_font.height, line2, strlen(line2), Pixel_state::PIXEL_ONE, Pixel_state::PIXEL_ZERO);
-        }
-    }
-    if (!is_preset_backup_mode) {
+    screen.center_string_on_two_lines(label_font, device_label, 0);
+    if (!is_preset_backup_mode && (num_in_cables !=0 || num_out_cables != 0)) {
         char preset_text[max_line_length];
         sprintf(preset_text, "Preset:%1x%s",Midi_processor_manager::instance().get_current_preset(), Midi_processor_manager::instance().needs_store()?"[M]":"");
         menu.set_menu_item_text(0,preset_text);
