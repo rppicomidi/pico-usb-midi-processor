@@ -37,10 +37,9 @@ connected to it. Each new external MIDI device gets its own
 set of 8 presets stored, so you will likely never run out
 of presets.
 
-The PUMP USB A port can also accept a USB Flash Drive to allow you to back up and restore all of your presets. Future versions of
-this code will allow you to restore the presets of one device at a
-time, and will allow you to export and import presets one preset
-at a time to any one device.
+The PUMP USB A port can also accept a USB Flash Drive to allow you to back up and restore all of your presets at once or the
+presets of one device only. Future versions of this code will
+allow you to export and import presets one preset at a time to any one device.
 
 # Disclaimers
 
