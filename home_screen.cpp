@@ -75,6 +75,7 @@ void rppicomidi::Home_screen::set_connected_device(const char* device_label_, ui
         midi_out_setup.push_back(new Midi_processor_setup_screen{screen, label_font, cable, false});
     printf("New connection %s %u IN %u OUT\r\n", device_label, num_in_cables, num_out_cables);
     is_preset_backup_mode = false;
+    menu.clear();
     if (num_in_cables !=0 || num_out_cables !=0) {
         preset_view = new Preset_view(screen, screen.get_clip_rect());
         auto preset_item = new View_launch_menu_item(*preset_view, "Presets...", screen, label_font);
@@ -99,6 +100,7 @@ void rppicomidi::Home_screen::set_connected_device(const char* device_label_, ui
 
 void rppicomidi::Home_screen::enter_preset_backup_mode(View& timeset_view)
 {
+    menu.clear();
     is_preset_backup_mode = true;
     strncpy(device_label, "Save/Restore Presets to Flash Drive", max_device_label);
     device_label[max_device_label] = '\0';
