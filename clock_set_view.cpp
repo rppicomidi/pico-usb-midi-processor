@@ -91,9 +91,12 @@ void rppicomidi::Clock_set_view::on_left(uint32_t delta, bool is_shifted)
         else {
             --item_idx;
         }
-        draw_field(prev_idx, false);
-        draw_field(item_idx, true);
     }
+    else {
+        item_idx = ok_idx; // wrap around
+    }
+    draw_field(prev_idx, false);
+    draw_field(item_idx, true);
 }
 
 void rppicomidi::Clock_set_view::on_right(uint32_t delta, bool is_shifted)
@@ -112,9 +115,12 @@ void rppicomidi::Clock_set_view::on_right(uint32_t delta, bool is_shifted)
         else {
             ++item_idx;
         }
-        draw_field(prev_idx, false);
-        draw_field(item_idx, true);
     }
+    else {
+        item_idx = month_idx; // wrap around
+    }
+    draw_field(prev_idx, false);
+    draw_field(item_idx, true);
 }
 
 void rppicomidi::Clock_set_view::on_increment(uint32_t delta, bool is_shifted)
