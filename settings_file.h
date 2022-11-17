@@ -172,6 +172,9 @@ public:
      * @return true if json_string contains valid data, false otherwise
      */
     bool get_setting_file_json_string(const char* directory, const char* file, char** json_string);
+
+    bool save_screenshot(const uint8_t* bmp, const int nbytes);
+    FRESULT export_all_screenshots();
 private:
     Settings_file();
 
@@ -206,6 +209,7 @@ private:
     static void static_fatfs_ls(EmbeddedCli* cli, char* args, void*);
     static void static_fatfs_backup(EmbeddedCli* cli, char* args, void*);
     static void static_fatfs_restore(EmbeddedCli* cli, char* args, void*);
+    static void static_fatfs_save_screenshots(EmbeddedCli*, char*, void*);
     FRESULT scan_files(const char* path);
     void print_fat_time(WORD wtime);
     void print_fat_date(WORD wtime);
@@ -213,5 +217,6 @@ private:
     uint16_t vid;       // the idVendor of the connected device (not serialized here)
     uint16_t pid;       // the idProduct of the connected device (not serialized here)
     static constexpr const char* base_preset_path = "/rppicomidi-pico-usb-midi-processor";
+    static constexpr const char* base_screenshot_path = "/rppicomidi-screenshots";
 };
 }

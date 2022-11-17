@@ -48,69 +48,76 @@ rppicomidi::Settings_file::Settings_file() : vid{0}, pid{0}
 
 void rppicomidi::Settings_file::add_all_cli_commands(EmbeddedCli *cli)
 {
-    embeddedCliAddBinding(cli, {
+    assert(embeddedCliAddBinding(cli, {
         "format",
         "format settings file system",
         false,
         this,
         static_file_system_format
-    });
-    embeddedCliAddBinding(cli, {
+    }));
+    assert(embeddedCliAddBinding(cli, {
         "fsstat",
         "display settings file system status",
         false,
         this,
         static_file_system_status
-    });
-    embeddedCliAddBinding(cli, {
+    }));
+    assert(embeddedCliAddBinding(cli, {
         "ls",
         "list all settings files",
-        false,
+        true,
         this,
         static_list_files
-    });
-    embeddedCliAddBinding(cli, {
+    }));
+    assert(embeddedCliAddBinding(cli, {
         "cat",
         "print file contents. usage: cat <fn>",
         true,
         this,
         static_print_file
-    });
-    embeddedCliAddBinding(cli, {
+    }));
+    assert(embeddedCliAddBinding(cli, {
         "rm",
         "delete. usage: rm <fn>",
         true,
         this,
         static_delete_file
-    });
-    embeddedCliAddBinding(cli, {
+    }));
+    assert(embeddedCliAddBinding(cli, {
         "fatcd",
         "change current directory. usage: fatcd <path>",
         true,
         this,
         static_fatfs_cd
-    });
-    embeddedCliAddBinding(cli, {
+    }));
+    assert(embeddedCliAddBinding(cli, {
         "fatls",
         "list current directory. usage: fatls",
         false,
         this,
         static_fatfs_ls
-    });
-    embeddedCliAddBinding(cli, {
+    }));
+    assert(embeddedCliAddBinding(cli, {
         "backup",
         "backup current presets. usage: backup",
         false,
         this,
         static_fatfs_backup
-    });
-    embeddedCliAddBinding(cli, {
+    }));
+    assert(embeddedCliAddBinding(cli, {
         "restore",
         "restore presets from back. usage: restore [path] or restore [path to one file]",
         true,
         this,
         static_fatfs_restore
-    });   
+    }));
+    assert(embeddedCliAddBinding(cli, {
+        "save-screenshots",
+        "saves screenshots already stored internally to flash",
+        false,
+        this,
+        static_fatfs_save_screenshots
+    }));
 }
 
 void rppicomidi::Settings_file::set_vid_pid(uint16_t vid_, uint16_t pid_)
@@ -356,6 +363,7 @@ FRESULT rppicomidi::Settings_file::backup_all_presets()
     pico_unmount();
     return FR_OK;
 }
+
 FRESULT rppicomidi::Settings_file::restore_one_file(const char* fullpath, const char* filename)
 {
     printf("Restoring %s\r\n", filename);
@@ -768,13 +776,23 @@ void rppicomidi::Settings_file::static_list_files(EmbeddedCli* cli, char* args, 
 {
     (void)cli;
     (void)args;
+    char path[256] = {'/','\0'};
+    uint16_t argc = embeddedCliGetTokenCount(args);
+    if (argc == 1) {
+        strncpy(path, embeddedCliGetToken(args, 1), sizeof(path)-1);
+        path[sizeof(path)-1] = '\0';
+    }
+    else {
+        printf("usage: ls [path]\r\n");
+    }
     auto me = reinterpret_cast<Settings_file*>(context);
     int error_code = pico_mount(false);
     if (error_code != LFS_ERR_OK) {
         printf("can't mount settings file system\r\n");
         return;
     }
-    error_code = me->lfs_ls("/");
+ 
+    error_code = me->lfs_ls(path);
     if (error_code != LFS_ERR_OK) {
         printf("error listing path \"/\"\r\n");
     }
@@ -861,6 +879,14 @@ void rppicomidi::Settings_file::static_fatfs_restore(EmbeddedCli* cli, char* arg
     }
     if (res != FR_OK) {
         printf("error %u restoring presets from %s\r\n", res, path);
+    }
+}
+
+void rppicomidi::Settings_file::static_fatfs_save_screenshots(EmbeddedCli*, char*, void*)
+{
+    FRESULT res = instance().export_all_screenshots();
+    if (res != FR_OK) {
+        printf("error %u saving screenshots\r\n", res);
     }
 }
 
@@ -963,4 +989,156 @@ void rppicomidi::Settings_file::static_delete_file(EmbeddedCli* cli, char* args,
             printf("Unexpected Error %s unmounting settings file system\r\n", pico_errmsg(error_code));
         }
     }
+}
+
+bool rppicomidi::Settings_file::save_screenshot(const uint8_t* bmp, const int nbytes)
+{
+    int err = pico_mount(false);
+    if (err != LFS_ERR_OK)
+        return false;
+    lfs_dir_t dir;
+    err = lfs_dir_open(&dir, base_screenshot_path);
+    if (err == LFS_ERR_OK) {
+        lfs_dir_close(&dir);
+    }
+    else if (err == LFS_ERR_NOENT) {
+        // directory does not exist. Need to create it
+        err = pico_mkdir(base_screenshot_path);
+        if (err != LFS_ERR_OK) {
+            pico_unmount();
+            printf("cannot make directory %s\r\n", base_screenshot_path);
+            return false;
+        }
+    }
+    else {
+        pico_unmount();
+        printf("error %s opening directory %s\r\n", pico_errmsg(err), base_screenshot_path);
+        return false;
+    }
+    uint16_t year;
+    uint8_t month, day, hour, minute, second;
+    Rp2040_rtc::instance().get_date(year, month, day);
+    Rp2040_rtc::instance().get_time(hour, minute, second);
+    char path[128];
+    snprintf(path, sizeof(path)-1, "%s/PUMP%02u%02u%04u%02u%02u%02u.bmp", base_screenshot_path, month, day, year, hour, minute, second);
+    path[sizeof(path)-1] = '\0';
+    lfs_file_t file;
+    err = lfs_file_open(&file, path, LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC);
+    if (err != LFS_ERR_OK) {
+        pico_unmount();
+        printf("error %s opening file %s for write\r\n", pico_errmsg(err), path);
+        return false;
+    }
+    err = lfs_file_write(&file, bmp, nbytes);
+    if (err != nbytes) {
+        printf("error %s writing BMP data to %s\r\n", pico_errmsg(err), path);
+    }
+    lfs_file_close(&file);
+    pico_unmount();
+    return err == nbytes;
+}
+
+FRESULT rppicomidi::Settings_file::export_all_screenshots()
+{
+    FRESULT fatres = f_chdrive("0:");
+    if (fatres != FR_OK)
+        return fatres;
+    fatres = f_chdir("/");
+    if (fatres != FR_OK)
+        return fatres;
+    lfs_dir_t dir;
+    int err = pico_mount(false);
+    if (err)
+        return FR_INT_ERR;
+    err = lfs_dir_open(&dir, base_screenshot_path);
+    if (err) {
+        pico_unmount();
+        return FR_INT_ERR;
+    }
+
+    struct lfs_info info;
+    bool flash_file_directory_ok = false;
+    while (true) {
+        int res = lfs_dir_read(&dir, &info);
+        if (res < 0) {
+            lfs_dir_close(&dir);
+            pico_unmount();
+            return FR_INT_ERR;
+        }
+
+        if (res == 0) {
+            break;
+        }
+        // There is at least one screenshot file. Make sure there is a directory to store it in.
+        if (!flash_file_directory_ok) {
+            fatres = f_chdir(base_screenshot_path);
+            if (fatres == FR_NO_PATH) {
+                fatres = f_mkdir(base_screenshot_path);
+                if (fatres != FR_OK) {
+                    lfs_dir_close(&dir);
+                    pico_unmount();
+                    return fatres;
+                }
+            }
+            fatres = f_chdir(base_screenshot_path);
+            if (fatres != FR_OK) {
+                lfs_dir_close(&dir);
+                pico_unmount();
+                return fatres;
+            }
+
+            flash_file_directory_ok = true;
+        }
+
+        if(info.type == LFS_TYPE_REG) {
+            char path[256];
+            strcpy(path, base_screenshot_path);
+            strcat(path,"/");
+            strcat(path, info.name);
+            lfs_file_t file;
+            err = lfs_file_open(&file, path, LFS_O_RDONLY);
+            if (err != LFS_ERR_OK) {
+                lfs_dir_close(&dir);
+                pico_unmount();
+                return FR_INT_ERR;
+            }
+            uint8_t* bmp = new uint8_t[info.size];
+            lfs_size_t nread = lfs_file_read(&file, bmp, info.size);
+            lfs_file_close(&file);
+            if (nread == info.size) {
+                FIL bufile;
+                fatres = f_open(&bufile, info.name, FA_CREATE_ALWAYS | FA_WRITE);
+                if (fatres != FR_OK) {
+                    delete[] bmp;
+                    lfs_dir_close(&dir);
+                    pico_unmount();
+                    return fatres;
+                }
+                UINT written;
+                fatres = f_write(&bufile, bmp, nread, &written);
+                delete[] bmp;
+                f_close(&bufile);
+                if (fatres != FR_OK) {
+                    lfs_dir_close(&dir);
+                    pico_unmount();
+                    return fatres;
+                }
+                printf("exported BMP file 0:%s/%s\r\n", base_screenshot_path, info.name);
+            }
+            else {
+                delete[] bmp;
+                lfs_dir_close(&dir);
+                pico_unmount();
+                return FR_INT_ERR;
+            }
+        }
+    }
+
+    err = lfs_dir_close(&dir);
+    if (err) {
+        pico_unmount();
+        return FR_INT_ERR;
+    }
+    pico_unmount();
+    return FR_OK;
 }

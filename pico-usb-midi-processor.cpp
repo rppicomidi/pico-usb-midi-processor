@@ -312,6 +312,19 @@ static void writeCharFn(EmbeddedCli *embeddedCli, char c)
     putchar(c);
 }
 
+static void screenshot(EmbeddedCli* cli, char* args, void* context)
+{
+    (void)cli;
+    (void)args;
+    (void)context;
+    int nbytes = rppicomidi::Pico_usb_midi_processor::instance().oled_screen.get_bmp_file_data_size();
+    auto bmp = rppicomidi::Pico_usb_midi_processor::instance().oled_screen.make_bmp_file_data();
+    if (bmp) {
+        rppicomidi::Settings_file::instance().save_screenshot(bmp, nbytes);
+        delete[] bmp;
+    }
+}
+
 // core0: handle device events
 int main()
 {
@@ -332,7 +345,7 @@ int main()
         .rxBufferSize = 64,
         .cmdBufferSize = 64,
         .historyBufferSize = 128,
-        .maxBindingCount = 10,
+        .maxBindingCount = 11,
         .cliBuffer = NULL,
         .cliBufferSize = 0,
         .enableAutoComplete = true,
@@ -350,6 +363,14 @@ int main()
     while(getchar_timeout_us(0) != PICO_ERROR_TIMEOUT) {
         // flush out the console input buffer
     }
+    CliCommandBinding ss = {
+        .name = "screenshot",
+        .help = "save a screenshot to internal settings flash",
+        .tokenizeArgs = false,
+        .context = NULL,
+        .binding = screenshot
+    };
+    assert(embeddedCliAddBinding(cli, ss));
     while (1) {
         instance_ptr->task();
         // update the CLI if need be
