@@ -746,7 +746,6 @@ void rppicomidi::Settings_file::static_file_system_format(EmbeddedCli*, char*, v
             printf("File system successfully formated and unmounted\r\n");
         }
     }
-
 }
 
 void rppicomidi::Settings_file::static_file_system_status(EmbeddedCli*, char*, void*)
@@ -954,6 +953,117 @@ void rppicomidi::Settings_file::static_print_file(EmbeddedCli* cli, char* args, 
     }
 }
 
+int rppicomidi::Settings_file::delete_file(const char* filename, bool mount)
+{
+    int error_code = LFS_ERR_OK;
+    if (mount)
+        error_code = pico_mount(false);
+    if (error_code == LFS_ERR_OK) {
+        error_code = pico_remove(filename);
+        if (error_code != LFS_ERR_OK) {
+            switch(error_code) {
+            case LFS_ERR_NOENT:
+                printf("File %s does not exist\r\n", filename);
+                break;
+            case LFS_ERR_ISDIR:
+                printf("%s is a directory\r\n",filename);
+                break;
+            case LFS_ERR_CORRUPT:
+                printf("%s is corrupt\r\n",filename);
+                break;
+            case LFS_ERR_IO:
+                printf("IO Error deleting %s\r\n", filename);
+                break;
+            default:
+                printf("Unexpected Error %s deleting %s\r\n", pico_errmsg(error_code), filename);
+                break;
+            }
+        }
+        if (mount)
+            error_code = pico_unmount();
+        if (error_code != LFS_ERR_OK) {
+            printf("Unexpected Error %s unmounting settings file system\r\n", pico_errmsg(error_code));
+        }
+    }
+    return error_code;
+}
+
+int rppicomidi::Settings_file::delete_all_files(const char* path)
+{
+    int error_code = pico_mount(false);
+    if (error_code == LFS_ERR_OK) {
+        lfs_dir_t dir;
+        struct lfs_info info;
+        error_code = lfs_dir_open(&dir, path);
+        while (true) {
+            int res = lfs_dir_read(&dir, &info);
+            if (res < 0) {
+                lfs_dir_close(&dir);
+                pico_unmount();
+                return res;
+            }
+            if (res == 0)
+                break;
+            if (info.type == LFS_TYPE_REG) {
+                // it's a file. delete it
+                if (strlen(path) == 0 || (strlen(path) == 1 && *path == '/')) {
+                    error_code = delete_file(info.name, false);
+                }
+                else {
+                    char fullpath[256];
+                    assert(strlen(path) < sizeof(fullpath)-2);
+                    strcpy(fullpath, path);
+                    strcat(fullpath, "/");
+                    strncat(fullpath, info.name, sizeof(fullpath)-1);
+                    fullpath[sizeof(fullpath)-1] -= '\0';
+                    error_code = delete_file(fullpath, false);
+                }
+                if (error_code != LFS_ERR_OK) {
+                    lfs_dir_close(&dir);
+                    pico_unmount();
+                    return error_code;
+                }
+            }
+        }
+        lfs_dir_close(&dir);
+        pico_unmount();
+    }
+    else {
+        printf("Unexpected Error %s mounting settings file system\r\n", pico_errmsg(error_code));
+    }
+    return error_code;
+}
+
+bool rppicomidi::Settings_file::get_all_preset_filenames(std::vector<std::string>& filename_list)
+{
+    int error_code = pico_mount(false);
+    if (error_code == LFS_ERR_OK) {
+        lfs_dir_t dir;
+        struct lfs_info info;
+        error_code = lfs_dir_open(&dir, "/");
+        while (true) {
+            int res = lfs_dir_read(&dir, &info);
+            if (res < 0) {
+                lfs_dir_close(&dir);
+                pico_unmount();
+                return res;
+            }
+            if (res == 0)
+                break;
+            if (info.type == LFS_TYPE_REG) {
+                // it's a file. add it to the list
+                filename_list.push_back(std::string(info.name));
+            }
+        }
+        lfs_dir_close(&dir);
+        pico_unmount();
+    }
+    else {
+        printf("Unexpected Error %s mounting settings file system\r\n", pico_errmsg(error_code));
+    }
+    return error_code;
+}
+
 void rppicomidi::Settings_file::static_delete_file(EmbeddedCli* cli, char* args, void*)
 {
     (void)cli;
@@ -962,33 +1072,7 @@ void rppicomidi::Settings_file::static_delete_file(EmbeddedCli* cli, char* args,
         return;
     }
     const char* fn=embeddedCliGetToken(args, 1);
-    int error_code = pico_mount(false);
-    if (error_code == LFS_ERR_OK) {
-        error_code = pico_remove(fn);
-        if (error_code != LFS_ERR_OK) {
-            switch(error_code) {
-            case LFS_ERR_NOENT:
-                printf("File %s does not exist\r\n", fn);
-                break;
-            case LFS_ERR_ISDIR:
-                printf("%s is a directory\r\n",fn);
-                break;
-            case LFS_ERR_CORRUPT:
-                printf("%s is corrupt\r\n",fn);
-                break;
-            case LFS_ERR_IO:
-                printf("IO Error deleting %s\r\n", fn);
-                break;
-            default:
-                printf("Unexpected Error %s deleting %s\r\n", pico_errmsg(error_code), fn);
-                break;
-            }
-        }
-        error_code = pico_unmount();
-        if (error_code != LFS_ERR_OK) {
-            printf("Unexpected Error %s unmounting settings file system\r\n", pico_errmsg(error_code));
-        }
-    }
+    Settings_file::instance().delete_file(fn);
 }
 
 bool rppicomidi::Settings_file::save_screenshot(const uint8_t* bmp, const int nbytes)

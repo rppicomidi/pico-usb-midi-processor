@@ -158,8 +158,30 @@ public:
      */
     bool get_next_backup_directory_name(char* dirname, size_t maxname);
 
+    /**
+     * @brief Get the all preset directory names from a USB flash drive
+     *
+     * @param dirname_list returns all the preset directory names on USB flash
+     * @return true if successful, false otherwise
+     */
     bool get_all_preset_directory_names(std::vector<std::string>& dirname_list);
+
+    /**
+     * @brief Get the all preset filenames from a USB flash drive
+     *
+     * @param directory_name contains the name of the directory that has the presets
+     * @param filename_list returns all the preset filenames in the directory on USB flash
+     * @return true if successful, false otherwise
+     */
     bool get_all_preset_filenames(const char* directory_name, std::vector<std::string>& filename_list);
+
+    /**
+     * @brief Get the all preset filenames stored locally
+     *
+     * @param filename_list contains the names of all the presets stored in local flash
+     * @return true if successful, false if not
+     */
+    bool get_all_preset_filenames(std::vector<std::string>& filename_list);
 
     /**
      * @brief Get the setting file json string object
@@ -175,6 +197,40 @@ public:
 
     bool save_screenshot(const uint8_t* bmp, const int nbytes);
     FRESULT export_all_screenshots();
+
+    /**
+     * @brief remove a file from the lfs filesystem
+     *
+     * @param filename the full path to the file
+     * @param mount is true to mount the filesystem on entry and unmount it on exit
+     * @return int LFS_ERR_OK if successful, a negative error code if not
+     */
+    int delete_file(const char* filename, bool mount=true);
+
+    /**
+     * @brief remove all files in the directory path specified by path.
+     *
+     * Do not delete directories, only files.
+     * @param path is the path to the directory where the files reside
+     * @return int LFS_ERR_OK if successful, a negative error code if not
+     */
+    int delete_all_files(const char* path);
+
+    /**
+     * @brief set raw_settings_ptr to point to the data contained in the settings
+     * file fn.
+     *
+     * The caller of this function must delete the memory allocated to raw_settings_ptr
+     * using delete[];
+     * @param fn the file name in lfs flash that contains the preset settings
+     * @param raw_settings_ptr will point to a new block of memory initialized to
+     * contain the preset settings
+     * @param mount is true if the lfs filesystem needs to be mounted on entry
+     * and unmounted on exit
+     * @return int the number of bytes in the settings string, or a negative
+     * LFS error code if there was an error.
+     */
+    int load_settings_string(const char* fn, char** raw_settings_ptr, bool mount=true);
 private:
     Settings_file();
 
@@ -186,8 +242,6 @@ private:
      * LFS error code if there was an error.
      */
     int load_settings_string(char** raw_settings_ptr);
-
-    int load_settings_string(const char* fn, char** raw_settings_ptr, bool mount=true);
 
     FRESULT restore_one_file(const char* restore_path, const char* filename);
 
