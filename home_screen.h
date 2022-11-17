@@ -33,7 +33,9 @@
 #include "view_launch_menu_item.h"
 #include "midi_processor_setup_screen.h"
 #include "preset_view.h"
-namespace rppicomidi {
+#include "settings_flash_view.h"
+namespace rppicomidi
+{
 class Home_screen : public View
 {
 public:
@@ -79,5 +81,6 @@ private:
     std::vector<Midi_processor_setup_screen*> midi_out_setup;
     Preset_view* preset_view;
     bool is_preset_backup_mode;
+    Settings_flash_view settings_flash_view;
 };
 }

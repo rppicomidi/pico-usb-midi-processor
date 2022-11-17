@@ -36,10 +36,10 @@ rppicomidi::Home_screen::Home_screen(Mono_graphics& screen_, const char* device_
     View{screen_, screen_.get_clip_rect()},
     label_font{screen.get_font_12()},
     menu{screen, static_cast<uint8_t>(label_font.height*2+4), label_font},
-    num_in_cables{0}, num_out_cables{0}, is_preset_backup_mode{false}
+    num_in_cables{0}, num_out_cables{0}, is_preset_backup_mode{false}, settings_flash_view{screen}
 {
     set_connected_device(device_label_, num_in_cables, num_out_cables);
-    auto item = new Menu_item("Settings Flash...", screen, label_font);
+    auto item = new View_launch_menu_item(settings_flash_view, "Presets memory...", screen, label_font);
     assert(item);
     menu.add_menu_item(item);
 }
@@ -113,6 +113,9 @@ void rppicomidi::Home_screen::enter_preset_backup_mode(View& timeset_view)
     menu.add_menu_item(item);
     auto restore = new Restore_view(screen);
     item = new View_launch_menu_item(*restore,"Restore...",screen, label_font);
+    assert(item);
+    menu.add_menu_item(item);
+    item = new View_launch_menu_item(settings_flash_view,"Presets memory...",screen, label_font);
     assert(item);
     menu.add_menu_item(item);
     menu.entry();
