@@ -1,18 +1,18 @@
 # pico-usb-midi-processor
 
+![](doc/pico-usb-midi-processor-prototype.jpg)
+
 The Pico USB MIDI Processor, or PUMP, is a Raspberry Pi Pico-based
 general purpose device that processes USB MIDI data between a USB
 Host such as a PC or Mac and an external USB MIDI device such as a keyboard
-or control surface. It has both a USB A Host connector that connects to your
-external MIDI device and a micro USB Device port that connects to your PC.
+or control surface. It has both a USB A Host connector that connects to your external MIDI device and a micro USB Device port that connects to
+your PC.
 
-![](doc/pico-usb-midi-processor-prototype.jpg)
+For a tutorial walkthrough of using the PUMP, see the [tutorial](./doc/TUTORIAL.md) document.
 
-The PUMP has a basic UI made from
-a 128x64 mono OLED display, 4 directional buttons (white), an Enter button
-(green), a Shift button (yellow) and a Back button (red). The Up and Down
-buttons double as increment and decrement buttons, and the Left button
-doubles as a delete from the list button.
+The PUMP has a basic UI made from a 128x64 mono OLED display, 4
+directional buttons (white), an Enter button (green), a Shift button
+(yellow) and a Back button (red). The Up and Down buttons double as increment and decrement buttons, and the Left button doubles as a delete from the list button.
 
 The PUMP inspects and can modify or filter out every USB MIDI packet
 between the MIDI device and USB host on every USB MIDI IN and MIDI OUT
@@ -27,8 +27,7 @@ filter or processor for the MIDI data. For example
 - and so on
 
 You can add as many MIDI processing algorithms as the on-chip RAM allows
-to make a complex processing chain for any MIDI port. The RP2040 has so much
-on-chip RAM that running out is unlikely. The software framework is
+to make a complex processing chain for any MIDI port. The RP2040 has so much on-chip RAM that running out is unlikely. The software framework is
 flexible enough to allow new processing functions to be added.
 
 The PUMP uses some of the Pico board's program flash to store
@@ -37,9 +36,9 @@ connected to it. Each new external MIDI device gets its own
 set of 8 presets stored, so you will likely never run out
 of presets.
 
-The PUMP USB A port can also accept a USB Flash Drive to allow you to back up and restore all of your presets at once or the
-presets of one device only. Future versions of this code will
-allow you to export and import presets one preset at a time to any one device.
+The PUMP USB A port can also accept a USB Flash Drive to allow you to back up and restore all of your presets at once or the presets of one device
+only. Future versions of this code will allow you to export and import
+presets one preset at a time to any one device.
 
 # Disclaimers
 
@@ -49,11 +48,12 @@ limiting, ESD protection, or other safeguards. Measure voltages carefully
 and please don't hook this to your expensive computer and MIDI equipment
 until you have done some testing with at least some basic test equipment.
 
-Also, any brand name stuff I mention in this README file is just documentation
-of what I did. This is not an advertisement. I don't get paid to do this.
+Also, any brand name stuff I mention in this README file is just
+documentation of what I did. This is not an advertisement. I don't get
+paid to do this.
 
-If you find issues with this document or with the code, please report them on
-this project's [github page](https://github.com/rppicomidi/pico-usb-midi-processor).
+If you find issues with this document or with the code, please report them
+on this project's [github page](https://github.com/rppicomidi/pico-usb-midi-processor).
 
 # Hardware
 
@@ -149,13 +149,16 @@ program flash; the fork is required to handle writing to flash
 whilst both RP2040 cores are active
 - the embedded-cli project to implement a debug command line
 interpreter; type help on the serial port console for a list of 
-commands.
-- the elm-chan fatfs file system modified to work with tinyusb for implementing external flash drive for preset backkup
+commands. Notably, the `screenshot` and `save-screenshots` commands
+are supported using this CLI library.
+- the elm-chan fatfs file system modified to work with tinyusb for implementing external flash drive for preset backkup and exporting
+screenshot files.
 - some modified font files from various projects for the OLEDs
 
 Some original library code includes
 - pico-ssd1306-mono-graphics-lib, a higher performance C++ SSD1306
-graphics library than others I tried. It also supports multiple
+graphics library than others I tried. It supports screen capture to BMP,
+which makes documentation a bit simpler. It also supports multiple
 displays at once, which is useful for a future hardware attachment
 I have planned for this project.
 - pico-mono-ui-lib, a C++ UI library that supports multi-line menus
@@ -258,185 +261,41 @@ Building using VS Code should be straightforward because I put a
 
 # Operating Instructions
 
-## Tutorial Demonstration
-Plug the PUMP's micro USB device port to a PC, Mac or other USB host.
-The screen should show the home screen of the UI. If you have nothing connected to the PUMP's USB host port, you will see:
+For a tutorial walkthrough of using the PUMP, see the [tutorial](./doc/TUTORIAL.md) document.
 
-![](doc/PUMP-no-connected-device.bmp)
+## UI Basics
+Most of the UI for the PUMP is made up of text menus that you navigate
+using "arrow buttons" up, down, left and right. You use single presses
+of the arrow buttons to navigate the menus. If you press and hold, then
+the arrow buttons will auto-repeat. If you hold shift and press arrow
+buttons, the interval will be larger. The menu item you have navigated to
+is shown in reverse video. If the menu item text has ... after it, it
+means that if you press the Enter button while it is displayed in reverse
+video, then a new screen will be displayed. You can always go back a screen by pressing the Back button, and you can return to the Home screen
+by holding the Shift button and pressing the Back button.
 
-The `Presets memory...` menu doesn't do much useful until you
-have used the PUMP for a while, so it is discussed later.
+If there are more menu items than will fit on a screen, then a vertical scroll bar will appear to the right showing you how many more items remain to be displayed.
 
-For now, plug your keyboard or other MIDI device to the PUMP's USB Host Port. The home screen will change to display the device name on the top one or two lines of the OLED followed by the current preset number, followed by a list of MIDI IN and MIDI OUT ports that the device normally exposes to your PC's or Mac's USB Host port.
+Some menus dynamically add items to the menu. For example, `Add new processor...` will add a new process to a MIDI port's processing list.
+You can delete dynamically added menu items by holding shift and pressing
+the Left button.
 
-For example, when I connect my keyboard to the PUMP, the
-display shows the home screen, which is a menu that looks like this:
+Some menu items contain editable number fields. To edit a number in a
+menu, navigate to the menu item containing the number, and press Enter.
+The number field will highlight instead of the whole menu item. Use
+the Up and Down buttons to edit the value. If the menu item contains
+more than one number, use the left and right buttons to change number
+fields. When done editing, press Enter again to record the change; the
+whole menu item will again be highlighted.
 
-![](doc/PUMP-device-plug.bmp)
+Some menu items contain a toggle parameter. For example, the `Display Decimal/Hex` menu item will toggle betwee `Display Decimal` and
+`Display Hex` when you press the Enter button.
 
-and your MIDI device will enumerate on your PC or Mac. If you experiment
-with your MIDI device now, it should work just the same as it does when
-you plug it directly to your PC or Mac.
-
-Most of the UI for the PUMP is made up of text menus. You use single
-presses of the arrow keys to navigate the menus. If you press and hold,
-then the arrow keys will auto-repeat. If you hold shift and press arrow
-keys, the interval will be larger. The menu item you have navigated to is
-shown in reverse video. If the menu item text has `...` after it, it means
-that if you press the Enter button while it is displayed in reverse video,
-then a new screen will be displayed. You can always go back a screen by
-pressing the Back button, and you can return to the Home screen by holding
-the Shift button and pressing the Back button.
-
-If there are more menu items than will fit on a screen, then a vertical scroll bar will appear to the right showing you how many more items remain
-to be displayed. For example, on this home screen, if I press and hold the
-Shift button and I press the Down button, I see
-
-![](doc/PUMP-device-scroll.bmp)
-
-To make the PUMP useful, you need to add some processors to the MIDI IN
-(to process MIDI from your MIDI device to the PC or Mac) and MIDI OUT
-(to process MIDI data from your PC or Mac to the MIDI device). If your
-device's USB MIDI implementation has more than one MIDI port, then
-you can add processing to any or all ports.
-
-This example demonstrates setting up processing on the PUMP to make the
-Arturia Keylab Essential 88 work better with Cubase in Mackie Control mode.
-This keyboard controller's USB interface has 2 MIDI IN and 2 MIDI OUT. In
-DAW control mode, DAW controls are on port 2 and all other keys are on
-port 1. I want to change the data sent from the keyboard to the DAW, so
-I need to add MIDI processors to MIDI IN 2. Navigate to `MIDI IN 2...` and press the Enter button. I see
-
-![](doc/PUMP-MIDIIN2-empty.bmp)
-
-I press the Enter button again so I can add a processor from the list of processors
-
-![](doc/PUMP-proc-list.bmp)
-
-The first thing I need to do is remap the MIDI messages for 3 buttons
-and their associated LEDs. To do that, I choose `Channel Button Remap`.
-
-![](doc/PUMP-proc-chan-button.bmp)
-
-and then press the Enter button. Now the `MIDI IN 2 Setup` screen looks
-like this:
-
-![](doc/PUMP-MIDIIN2-one-proc.bmp)
-
-If I press the Up button to select `Channel Button Remap` and press the
-Enter button, I can set up the processor:
-
-![](doc/PUMP-chan-but-empty.bmp)
-
-A Mackie Control button sends note on messages to the DAW and receives note
-on messages from the DAW to change the button LED state. To change the
-functionality, of a button, I have to remap its note number. `Note Number
-Remap` is correct. Mackied Control button messages are all on channel 1,
-so the selected channel is correct. I prefer working with note numbers in
-Hex, so I navigate to `Display Decimal` and press Enter. That changes the
-screen to `Display Hex`. Then I navigate to `Add new remap` and press
-Enter. I see `Remap:**->**` highlighted. 
-
-The UI shows remaps with the "from" number to the left of the arrow and
-the "to" remapped number to the right. If the number is shown with
-all asterix (`*`) symbols, then the remap is disabled if it is on the
-left side and it is filtered out if on the right side. `**->**` does
-nothing. I press Enter again to set up the remap. The screen looks like
-this now:
-
-![](doc/PUMP-but-remap-edit1.bmp)
-
-As you can see, just one `**` is highlighted. That means I can edit it.
-I use the Up and Down buttons (and the Shift button to make big jumps)
-to change the "from" note number to `50`.
-
-![](doc/PUMP-remap-edit-50-none.bmp)
-
-Next I press the Right button to edit the "to" note number. I use the Up,
-Down and Shift buttons to set the "to" note number to 48.
-
-![](doc/PUMP-remap-edit-50-48.bmp)
-
-Finally, I press the Enter button record the changes
-
-![](doc/PUMP-remap-50-48.bmp)
-
-Now the Up and Down Buttons navigate the menu again. I need to remap note
-51->46 and filter out note 58. The result is.
-
-![](doc/PUMP-but-remap-3.bmp)
-
-The button remapping is done. I press the Back button, and then I add the
-`MC Fader Pickup` processor so that Mackie Control fader movements don't
-make values "jump" when I first move them. The screen looks like this:
-
-![](doc/PUMP-but-MC.bmp)
-
-If I navigate to `MC Fader Pickup` and press Enter, I see
-
-![](doc/PUMP-MC-setup.bmp)
-
-So I am done. I press Shift and Back. Now I see
-
-![](doc/PUMP-preset-1M.bmp)
-
-The `[M]` means Preset 1 data has been modified and will not be saved if
-I unplug the keyboard from the PUMP or if I unplug the PUMP from my
-computer. I want to save the current changes back to preset 1.
-I navigate to `Preset:1[M]` and press Enter. I see the `Next Preset:` is
-already 1, so I navigate to `Save next preset`
-
-![](doc/PUMP-preset-save.bmp)
-
-and press Enter. The PUMP automatically returns to the Home screen when
-Preset 1 is saved. The `[M]` is now gone from the home screen.
-
-![](doc/PUMP-preset-done.bmp)
-
-
-Remapping note one messages 
-  use the Down button to 
-If a menu item is highlighted, you can press the Enter button
-to go one menu level deeper or enter edit mode for the
-highlighted menu item.
-
-If you press the Back button, the UI will go back one screen. If 
-you hold the Shift button and press the Back button, then the
-UI will return to the home screen.
-
-If you press the Enter button on when a menu item that starts "Setup MIDI"
-is shown in reverse video, you can set up the processing for that MIDI port.
-
-In the MIDI Port Setup screen, you add a processor to that port's
-processing chain by pressing the Enter button whilst `Add new processor...`
-is highlighted. A list of available processors will show up. Use the Up and
-Down buttons to choose the processor you want to add and then press the Enter button
-to add it. The UI will return to the MIDI port setup screen. The
-screen will show the processor added right above `Add new processor...`
-If you changed your mind before you added the
-processor, press the Back/Home button to return to the MIDI port
-setup screen. To go all the way back to the home screen,
-hold the Shift button and then press the Back/Home button.
-
-If you added a processor by mistake, highlight the processor using
-the Up and Down buttons. Press and hold the Shift button and then
-press the Left button to delete it.
-There is no confirmation, so be careful. You can configure the
-processor by using the Up or Down buttons to highlight it, then
-pressing Enter.
-
-You adjust most processor parameters by using the Up and Down
-buttons to choose the paramater, then press the Enter button
-to edit the paramater. If it is a toggle parameter (like the
-Display Decimal/Hex format setting), pressing the Enter button just
-toggles the parameter. If it is a parameter you choose from a list,
-then pressing Enter will change to a screen with the list of items
-to choose; navigate to the item you want and press Enter to select
-it. Otherwise, pressing Enter will highlight the value you can
-change. In this edit mode, the Up and Down buttons increment or
-decrement the paramter value. Holding the Up or Down buttons will repeat the increment or decrement action. Press and hold Shift and then pressing Up or Down will increase the increment or decrement interval. If there are multiple parameters on a line, use the Left
-button or Right button to choose the parameter to increment or
-decrement. When you are done editing parameters in edit mode, press the Enter button again.
+Some menu items are selected from a list. For example, when you press
+`Add New Processor`, you need to choose a MIDI processor type from a list.
+If it is a parameter you choose from a list, then pressing Enter will
+change to a screen with the list of items to choose; navigate to the item
+you want and press Enter to select it.
 
 Once you start editing presets, the home screen will show
 `Preset:1[M]` or similar. The `[M]` means that the current
@@ -444,13 +303,8 @@ preset has been modified. If you want to save it, highlight
 the `Preset:1[M]` line on the home screen and press Enter.
 You will see the Preset screen
 
-```
- Current Preset:1[M]
-Next Preset:1
-Save next preset
-Load next preset
-Reset next preset
-```
+![](./doc/PUMP-preset-save.bmp)
+
 To save the changes to the current preset, navigate to 
 `Save next preset` and press Enter. The preset will be saved and
 the UI will return to the home screen. You will note that
@@ -460,7 +314,8 @@ That means the current preset is stored in flash.
 If you change the Next Preset value in the preset screen,
 you can save the current state to that new preset number,
 you can load the settings for that preset number, or
-you can start with a new blank preset with that number.
+you can start with a new blank preset with that number by using
+`Reset next preset`.
 
 If you don't want to use the PUMP with a particular device
 anymore, or if something goes wrong with the PUMP settings
