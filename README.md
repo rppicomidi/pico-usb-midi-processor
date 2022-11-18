@@ -258,56 +258,144 @@ Building using VS Code should be straightforward because I put a
 
 # Operating Instructions
 
-## Quick Start
+## Tutorial Demonstration
 Plug the PUMP's micro USB device port to a PC, Mac or other USB host.
-The screen should show the home screen of the UI. If you have no MIDI
-device connected to the PUMP's USB host port, you will see:
+The screen should show the home screen of the UI. If you have nothing connected to the PUMP's USB host port, you will see:
 
-```
-PICO MIDI PROCESSOR
-No Connected Device
-```
+![](doc/PUMP-no-connected-device.bmp)
 
-If you plug your keyboard or other MIDI device to the PUMP's USB Host Port,
-the home screen will change to display the device name on the top one or
-two lines of the OLED followed by the current preset number, followed
-by a list of MIDI IN and MIDI OUT ports that the device normally exposes
-to your PC's or Mac's USB Host port.
+The `Presets memory...` menu doesn't do much useful until you
+have used the PUMP for a while, so it is discussed later.
+
+For now, plug your keyboard or other MIDI device to the PUMP's USB Host Port. The home screen will change to display the device name on the top one or two lines of the OLED followed by the current preset number, followed by a list of MIDI IN and MIDI OUT ports that the device normally exposes to your PC's or Mac's USB Host port.
 
 For example, when I connect my keyboard to the PUMP, the
-display shows the home screen:
+display shows the home screen, which is a menu that looks like this:
 
-```
-  Arturia Keylab
-   Essential 88
-Preset:1
-Setup MIDI IN 1
-Setup MIDI IN 2
-```
+![](doc/PUMP-device-plug.bmp)
 
-`Preset:1` should show in reverse video the after you
-connect a device. MIDI IN and MIDI
-OUT are from the USB Host's (the PC's or MAC's) perspective.
+and your MIDI device will enumerate on your PC or Mac. If you experiment
+with your MIDI device now, it should work just the same as it does when
+you plug it directly to your PC or Mac.
 
-If you press the Up or Down buttons, you can navigate the menu.
-If there are more than 2 total MIDI IN or MIDI OUT ports,
-then all won't fit on the screen. A vertical progress bar on the
-right will appear to let you know you can navigate beyond what
-is visible. The display will scroll as required. If you want
-to scroll beyond what is visible in one go, press and hold the
-Shift button before you press the Up or Down button.
+Most of the UI for the PUMP is made up of text menus. You use single
+presses of the arrow keys to navigate the menus. If you press and hold,
+then the arrow keys will auto-repeat. If you hold shift and press arrow
+keys, the interval will be larger. The menu item you have navigated to is
+shown in reverse video. If the menu item text has `...` after it, it means
+that if you press the Enter button while it is displayed in reverse video,
+then a new screen will be displayed. You can always go back a screen by
+pressing the Back button, and you can return to the Home screen by holding
+the Shift button and pressing the Back button.
 
-For example, if I scroll the home screen menu all the way
-to the end, I see
+If there are more menu items than will fit on a screen, then a vertical scroll bar will appear to the right showing you how many more items remain
+to be displayed. For example, on this home screen, if I press and hold the
+Shift button and I press the Down button, I see
 
-```
-  Arturia Keylab
-   Essential 88
-Setup MIDI IN 2
-Setup MIDI OUT 1
-Setup MIDI OUT 2
-```
+![](doc/PUMP-device-scroll.bmp)
 
+To make the PUMP useful, you need to add some processors to the MIDI IN
+(to process MIDI from your MIDI device to the PC or Mac) and MIDI OUT
+(to process MIDI data from your PC or Mac to the MIDI device). If your
+device's USB MIDI implementation has more than one MIDI port, then
+you can add processing to any or all ports.
+
+This example demonstrates setting up processing on the PUMP to make the
+Arturia Keylab Essential 88 work better with Cubase in Mackie Control mode.
+This keyboard controller's USB interface has 2 MIDI IN and 2 MIDI OUT. In
+DAW control mode, DAW controls are on port 2 and all other keys are on
+port 1. I want to change the data sent from the keyboard to the DAW, so
+I need to add MIDI processors to MIDI IN 2. Navigate to `MIDI IN 2...` and press the Enter button. I see
+
+![](doc/PUMP-MIDIIN2-empty.bmp)
+
+I press the Enter button again so I can add a processor from the list of processors
+
+![](doc/PUMP-proc-list.bmp)
+
+The first thing I need to do is remap the MIDI messages for 3 buttons
+and their associated LEDs. To do that, I choose `Channel Button Remap`.
+
+![](doc/PUMP-proc-chan-button.bmp)
+
+and then press the Enter button. Now the `MIDI IN 2 Setup` screen looks
+like this:
+
+![](doc/PUMP-MIDIIN2-one-proc.bmp)
+
+If I press the Up button to select `Channel Button Remap` and press the
+Enter button, I can set up the processor:
+
+![](doc/PUMP-chan-but-empty.bmp)
+
+A Mackie Control button sends note on messages to the DAW and receives note
+on messages from the DAW to change the button LED state. To change the
+functionality, of a button, I have to remap its note number. `Note Number
+Remap` is correct. Mackied Control button messages are all on channel 1,
+so the selected channel is correct. I prefer working with note numbers in
+Hex, so I navigate to `Display Decimal` and press Enter. That changes the
+screen to `Display Hex`. Then I navigate to `Add new remap` and press
+Enter. I see `Remap:**->**` highlighted. 
+
+The UI shows remaps with the "from" number to the left of the arrow and
+the "to" remapped number to the right. If the number is shown with
+all asterix (`*`) symbols, then the remap is disabled if it is on the
+left side and it is filtered out if on the right side. `**->**` does
+nothing. I press Enter again to set up the remap. The screen looks like
+this now:
+
+![](doc/PUMP-but-remap-edit1.bmp)
+
+As you can see, just one `**` is highlighted. That means I can edit it.
+I use the Up and Down buttons (and the Shift button to make big jumps)
+to change the "from" note number to `50`.
+
+![](doc/PUMP-remap-edit-50-none.bmp)
+
+Next I press the Right button to edit the "to" note number. I use the Up,
+Down and Shift buttons to set the "to" note number to 48.
+
+![](doc/PUMP-remap-edit-50-48.bmp)
+
+Finally, I press the Enter button record the changes
+
+![](doc/PUMP-remap-50-48.bmp)
+
+Now the Up and Down Buttons navigate the menu again. I need to remap note
+51->46 and filter out note 58. The result is.
+
+![](doc/PUMP-but-remap-3.bmp)
+
+The button remapping is done. I press the Back button, and then I add the
+`MC Fader Pickup` processor so that Mackie Control fader movements don't
+make values "jump" when I first move them. The screen looks like this:
+
+![](doc/PUMP-but-MC.bmp)
+
+If I navigate to `MC Fader Pickup` and press Enter, I see
+
+![](doc/PUMP-MC-setup.bmp)
+
+So I am done. I press Shift and Back. Now I see
+
+![](doc/PUMP-preset-1M.bmp)
+
+The `[M]` means Preset 1 data has been modified and will not be saved if
+I unplug the keyboard from the PUMP or if I unplug the PUMP from my
+computer. I want to save the current changes back to preset 1.
+I navigate to `Preset:1[M]` and press Enter. I see the `Next Preset:` is
+already 1, so I navigate to `Save next preset`
+
+![](doc/PUMP-preset-save.bmp)
+
+and press Enter. The PUMP automatically returns to the Home screen when
+Preset 1 is saved. The `[M]` is now gone from the home screen.
+
+![](doc/PUMP-preset-done.bmp)
+
+
+Remapping note one messages 
+  use the Down button to 
 If a menu item is highlighted, you can press the Enter button
 to go one menu level deeper or enter edit mode for the
 highlighted menu item.
@@ -373,6 +461,87 @@ If you change the Next Preset value in the preset screen,
 you can save the current state to that new preset number,
 you can load the settings for that preset number, or
 you can start with a new blank preset with that number.
+
+If you don't want to use the PUMP with a particular device
+anymore, or if something goes wrong with the PUMP settings
+memory, you may need to use that `Presets menu...` option.
+Selecting it gives you this screen:
+
+![](doc/PUMP-delete-presets.bmp)
+
+`Delete all` erases all the presets in preset memory but does
+not fully reformat the preset memory.
+
+`Reformat memory` reformats the preset memory and deletes all
+of the preset files.
+
+If you only want to delete one device's presets, choose its
+preset file name, which is made up the of the USB MIDI device's
+Vendor ID and Product ID. When you navigate to one of those, PUMP
+displays the product's name on the first two lines of the screen.
+For example
+
+![](doc/PUMP-delete-one.bmp)
+
+PUMP supports backing up and restoring preset files to
+any USB flash drive up to 32 GB. Just unplug your MIDI device
+and plug in a USB flash drive. You will see a screen for setting
+up the on-chip real-time clock date and time:
+
+![](doc/PUMP-clock-set.bmp)
+
+All files on the USB flash drives have a date and time stamp. As
+you modify files on the drive, the Pico will update that date and
+time stamp as read from the on-chip real-time clock. To set the
+date and time, use the left and right arrows to highlight a field
+and the up and down arrows to change the values. Press Set when
+you are done. When you do that, you will see a new screen
+
+![](doc/PUMP-flash-drive-home-screen.bmp)
+
+You can select `Set Date/Time...` to fix the date and time if
+you chose `Set` by mistake.
+
+If you choose `Backup...` you will
+see a new screen with only one option
+
+![](doc/PUMP-backup-presets.bmp)
+
+If you press select, the PUMP will copy all preset files in preset
+memory to the USB flash drive in the folder `/rppicomidi-pico-usb-midi-processor/[Next Backup Folder]` where
+`[Next Backup Folder]` is the 2nd line of the display. The format
+is `MM-DD-YYYY-V` where `MM` is the 2-digit month, `DD` is the
+2-digit day, and `YYYY` is the 4-digit year. If you choose to
+backup all presets more than once on a given day, the PUMP will
+add `-V` after the date part of the directory name, where `V`
+is the number of times after the first one that the backup
+was saved to this flash drive.
+
+If you choose the `Restore...` option from the `Save/Restore Presets to Flash Drive` screen, you will see
+
+![](doc/PUMP-restore-presets.bmp)
+
+This screen will show you a list of all backup directories that
+contain presets. Choose the backup directory you want to use. You
+will see a screen like this:
+
+![](doc/PUMP-restore-presets-files.bmp)
+
+The `All files` choice will restore to the preset memory all
+of the preset files that were backed up to the selected folder.
+If you only want to restore a single device's presets, you should
+choose a single file. Files are named by the device's USB Vendor
+and Product ID numbers. When you navigate to one, PUMP will display
+the name of the device on the first two lines of the screen. For
+example:
+
+![](doc/PUMP-restore-presets-device.bmp)
+
+When you press the Enter button, PUMP will restore the presets
+only for that device.
+
+For your convenience, the `Save/Restore Presets to Flash Drive` menu
+also provides a way to access the `Presets memory...` option.
 
 ## Processing paths
 
