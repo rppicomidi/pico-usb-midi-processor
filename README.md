@@ -1,18 +1,18 @@
 # pico-usb-midi-processor
 
-![](doc/pico-usb-midi-processor-prototype.jpg)
+![](doc/PUMP_dev_board.JPG)
 
 The Pico USB MIDI Processor, or PUMP, is a Raspberry Pi Pico-based
 general purpose device that processes USB MIDI data between a USB
-Host such as a PC or Mac and an external USB MIDI device such as a keyboard
-or control surface. It has both a USB A Host connector that connects to your external MIDI device and a micro USB Device port that connects to
-your PC.
+Host such as a PC or Mac and an external USB MIDI device such as a keyboard or control surface. It has both a USB A Host connector that
+connects to your external MIDI device and a micro USB Device port
+that connects to your PC.
 
 For a tutorial walkthrough of using the PUMP, see the [tutorial](./doc/TUTORIAL.md) document.
 
 The PUMP has a basic UI made from a 128x64 mono OLED display, 4
 directional buttons (white), an Enter button (green), a Shift button
-(yellow) and a Back button (red). The Up and Down buttons double as increment and decrement buttons, and the Left button doubles as a delete from the list button.
+(yellow) and a Back button (red).
 
 The PUMP inspects and can modify or filter out every USB MIDI packet
 between the MIDI device and USB host on every USB MIDI IN and MIDI OUT
@@ -79,38 +79,31 @@ pins for the OLED's I2C port, and 2 pins for a debug UART.
 
 Wiring consists of the USB Host port, the buttons, the display, and optionally
 the debug port. Here is a crude wiring diagram with the debug hardware not
-shown ![](doc/pico-usb-midi-processor_wiring.png).
+shown ![](doc/PUMP_wiring.jpg).
 
 ## Wiring the USB Host port
 
-I used a [Sparkfun CAB-10177](https://www.sparkfun.com/products/10177) with the green and white
-wires (D+ and D- signals) swapped on the 4-pin female header connector. I soldered a 4-pin male header
-to pins 1-3 of the Pico board and left one of the pins hanging off the edge of the board. I soldered
-a wire from that pin hanging off the edge of the board to Pin 40 of the Pico board (VBus). I then
-plugged the 4-pin female header connector so the black wire (ground) connects to Pin 3 of the Pico
-board, the red wire connects to pin hanging off the edge of the Pico board, the green wire connects
-to pin 1 of the Pico board, and the white wire connects to pin 2 of the Pico board. If you want to
-add series termination resistors to D+ and D-, resistors between 22 and 33 ohms are probably close.
-I didn't bother and it seemed good enough for my testing. Here is a photo of
-just the USB host wiring ![](doc/pico-usb-midi-processor-usb-host.jpg)
+I used a USB A female breakout board for the USB Host connector. I
+cut the D+ and D- minus traces and scraped back enough solder mask
+to solder in two 0603 27 ohm 1% metal film resistors in line with
+the D+ and D- signals. I wired the D+ signal post resistor to Pico
+board pin 1, and I wired the D- signal post resistor to Pico board
+Pin 2. I wired the +5V of the breakout board to the Pico Vbus pin 40. I wired the GND of the breakout board to Pico GND pin 3.
+
+![](doc/PUMP_USB_A.JPG)
 
 ## Wiring the buttons
 
-The software detects a button press as a GP pin shorted to ground. The software configures
-each button GP pin to have the on-chip pull-up resistor active. Connect one pin of each of the
-7 buttons to ground and connect the remaining pin of the button to its own GP input. I used
-pin 13 of the Pico board for ground, pins 9-12 for Right, Shift, Down and Enter, and pins 14-16
-for Left, Up and Back.
+The software detects a button press as a GP pin shorted to ground. The software configures each button GP pin to have the on-chip pull-up resistor active. Connect one pin of each of the 7 buttons to ground and connect the remaining pin of the button to its own GP input. I used pin 13 of the Pico board for ground, pins 9-12 for Right, Shift, Down and Enter, and pins 14-16 for Left, Up and Back.
 
 ## Wiring the Display
 
-Look very carefully at your OLED module. The diagram shows
-one possible pinout. Many have VCC and GND swapped. Do
-not hook these up backwards or your display may be destroyed.
-There will be 4 pins on the top of the display labeled VCC, GND, SCL and SDA. The VCC 
-pin goes to the 3.3V regulated supply output on Pico pin 36. The GND pin
-goes to the GND pin on Pico pin 23. SCL and SDA go to Pico Pins 24 and 25,
-respectively.
+Look very carefully at your OLED module. The diagram shows one possible pinout. Many have VCC and GND swapped. Do not hook these up
+backwards or your display may be destroyed. There will be 4 pins on
+the top of the display labeled VCC, GND, SCL and SDA. The VCC pin
+goes to the 3.3V regulated supply output on Pico pin 36. The GND pin
+goes to the GND pin on Pico pin 23. SCL and SDA go to Pico Pins 24
+and 25, respectively.
 
 ## Wiring the Picoprobe
 
@@ -141,7 +134,8 @@ This project uses the main application files plus some libraries
 from various GitHub projects.
 - the Pico-PIO-USB project and a fork of the tinyusb project to
 implement the USB communications; the fork was required to add
-USB MIDI Host functionality
+USB MIDI Host functionality and to allow the USB Device Port
+to clone the connected MIDI device's USB descriptor.
 - the parson project to implement JSON format settings storage
 - a fork of the pico-littlefs project to implement the littlefs
 flash file system with journal and wear leveling on the Pico
@@ -212,7 +206,7 @@ $PICO_DIR
             |
             +--RPi-Pico-SSD1306-library (a font library)
             |
-            +--ssd1306
+            +--ssd1306 (a font library)
 ```
 
 ### Step By Step
@@ -288,7 +282,7 @@ more than one number, use the left and right buttons to change number
 fields. When done editing, press Enter again to record the change; the
 whole menu item will again be highlighted.
 
-Some menu items contain a toggle parameter. For example, the `Display Decimal/Hex` menu item will toggle betwee `Display Decimal` and
+Some menu items contain a toggle parameter. For example, the `Display Decimal/Hex` menu item will toggle between `Display Decimal` and
 `Display Hex` when you press the Enter button.
 
 Some menu items are selected from a list. For example, when you press
@@ -416,7 +410,7 @@ Some processors have "feedback" processing. For example, if you
 remap a control surface button that has an LED, usually the DAW
 will use the same message to control the LED that the control
 surface sends to the DAW to indicate button press. For this example,
-if pressing the control surface button sends NOTE ON 50, to the DAW, then the
+if pressing the control surface button sends NOTE ON 50 to the DAW, then the
 DAW will send back NOTE ON 50 to light the button's LED. If
 you assign a PUMP processor to remap control surface button's MIDI note
 number to something else, then that processor needs a feedback
@@ -468,3 +462,7 @@ note number. You can view the min and max note numbers
 in Decimal or Hex format in the settings screen.
 - More processors are coming. I have not gotten to them
 yet.
+
+# Revision History
+18-November-2022: PUMP repo goes public. All documented features function.
+More MIDI processors are coming. Still need to make an enclosure for it.
