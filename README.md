@@ -119,7 +119,7 @@ on the bottom of the board wire to the corresponding pins on the Pico Probe.
 The PUMP project uses original code plus a lot of code from other
 projects on GitHub. Most are git submodules. All code is written
 in C, C++, or the RP2040's PIO state machine assembly code. To
-build it, you need to install the Pico C SDK version 1.4.0 or later.
+build it, you need to install the Pico C SDK version 1.5.1 or later.
 Install this code plus the compiler toolchain per the instructions 
 in the [Getting Started with Raspberry Pi Pico C/C++ development](https://datasheets.raspberrypi.com/pico/getting-started-with-pico.pdf)
 document Chapter 2. Unless you are using a Raspberry Pi for development,
@@ -132,10 +132,9 @@ described in Appendix A for debugging and code development.
 ### Preview
 This project uses the main application files plus some libraries
 from various GitHub projects.
-- the Pico-PIO-USB project and a fork of the tinyusb project to
-implement the USB communications; the fork was required to add
-USB MIDI Host functionality and to allow the USB Device Port
-to clone the connected MIDI device's USB descriptor.
+- the Pico-PIO-USB project and a patched version of TinyUSB
+implement the USB communications with the help of two application
+USB MIDI drivers.
 - the parson project to implement JSON format settings storage
 - a fork of the pico-littlefs project to implement the littlefs
 flash file system with journal and wear leveling on the Pico
@@ -184,7 +183,7 @@ $PICO_DIR
     |                   +--raspberry_pi
     |                       |
     |                       +--Pico-PIO-USB (need to force
-    |                           this submodule to install)
+    |                           this to install using a Python script)
     |
     +--pico-usb-midi-processor
         |
@@ -193,6 +192,10 @@ $PICO_DIR
         |   +--pico-mono-graphics-lib
         |   |
         |   +--pico-mono-ui-lib
+        |   |
+        |   +--usb_midi_dev_ac_optional
+        |   |
+        |   +--usb_midi_host
         |
         +--ext_lib
             |
@@ -208,6 +211,13 @@ $PICO_DIR
             |
             +--ssd1306 (a font library)
 ```
+Note: previous revisions of this project used my forked version
+of TinyUSB. Keeping this fork up to date has proved to be
+cumbersome. If you are updating from a previous version of this
+project, start by reverting your TinyUSB library to the regular
+release from the TinyUSB GitHub repository. This code now uses an
+application device driver, and application host driver, some
+newer TinyUSB functions that are standard now, and one patch.
 
 ### Step By Step
 
@@ -224,17 +234,14 @@ git clone https://github.com/rppicomidi/pico-usb-midi-processor.git
 git submodule update --recursive --init
 
 # make sure you have the latest Pico C SDK
-cd pico-sdk
+cd ${PICO_SDK_PATH}
 git pull
-# get my fork of the tinyusb library with MIDI Host support
+# get the latest verson of the tinyusb library with application host driver support
 cd lib/tinyusb
-git remote add upstream https://github.com/hathach/tinyusb.git
-git remote set-url origin https://github.com/rppicomidi/tinyusb.git
-git fetch origin
-git checkout -b pio-midihost origin/pio-midihost
-# get the Pico-PIO-USB submodule into the source tree
-cd hw/mcu/raspberry_pi
-git submodule update --init Pico-PIO-USB
+git pull
+# get the Pico-PIO-USB project into the source tree
+python3 tools/get_deps.py rp2040
+git apply 0001-Allow-defining-CFG_TUD_ENDPOINT0_SIZE-as-a-function.patch
 ```
 
 To build on a Linux build host, use the following command line
@@ -242,8 +249,8 @@ commands. (A Mac Homebrew installation should use the same instructions;
 I have no idea on a PC). `$PICO_DIR` refers to the some top level directory
 where you are are storing your Raspberry Pi Pico source code.
 ```
-export PICO_SDK_PATH=$PICO_DIR/pico-sdk/
-cd $PICO_DIR/pico-usb-midi-filter
+export PICO_SDK_PATH=${PICO_DIR}/pico-sdk/
+cd ${PICO_DIR}/pico-usb-midi-processor
 mkdir build
 cd build
 cmake ..
