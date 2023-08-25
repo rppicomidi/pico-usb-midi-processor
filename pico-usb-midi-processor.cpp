@@ -79,7 +79,6 @@ public:
     void clone_complete_cb();
     void poll_midi_dev_rx();
 
-    const uint LED_GPIO=PICO_DEFAULT_LED_PIN;
     const uint8_t OLED_ADDR=0x3c;   // the OLED I2C address as a constant
     uint8_t addr[1];                // the OLED I2C address is stored here
     const uint8_t MUX_ADDR=0;       // no I2C mux
@@ -116,9 +115,6 @@ rppicomidi::Pico_usb_midi_processor::Pico_usb_midi_processor()  : addr{OLED_ADDR
     home_screen{oled_screen, "PICO MIDI PROCESSOR No Connected Device"},
     nav_buttons{oled_view_manager}
 {
-    //gpio_init(LED_GPIO);
-    //gpio_set_dir(LED_GPIO, GPIO_OUT);
-
     // Set up the button GPIO
     gpio_init(BUTTON_UP);
     gpio_init(BUTTON_DOWN);
@@ -219,7 +215,6 @@ void rppicomidi::Pico_usb_midi_processor::task()
     int64_t diff = absolute_time_diff_us(previous_timestamp, now);
     if (diff > 1000000) {
         board_led_write(led_state);
-        //gpio_put(rppicomidi::Pico_usb_midi_processor::instance().LED_GPIO, led_state);
         led_state = !led_state;
         previous_timestamp = now;
     }
@@ -442,7 +437,7 @@ extern "C" void main_loop_task()
     
     int64_t diff = absolute_time_diff_us(previous_timestamp, now);
     if (diff > 1000000) {
-        gpio_put(rppicomidi::Pico_usb_midi_processor::instance().LED_GPIO, led_state);
+        board_led_write(led_state);
         led_state = !led_state;
         previous_timestamp = now;
     }
