@@ -20,6 +20,9 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
 #include <cstdlib>
 #include <cstdio>
 #include <cstring>
@@ -39,8 +42,8 @@
 #include "hardware/watchdog.h"
 
 #include "tusb.h"
-#include "bsp/board.h"
-#include "class/midi/midi_host.h"
+#include "bsp/board_api.h"
+#include "usb_midi_host.h"
 #include "class/midi/midi_device.h"
 #include "usb_descriptors.h"
 #include "home_screen.h"
@@ -75,7 +78,6 @@ public:
     void task();
     void clone_complete_cb();
     void poll_midi_dev_rx();
-    void poll_midi_host_rx();
 
     const uint LED_GPIO=PICO_DEFAULT_LED_PIN;
     const uint8_t OLED_ADDR=0x3c;   // the OLED I2C address as a constant
@@ -114,8 +116,8 @@ rppicomidi::Pico_usb_midi_processor::Pico_usb_midi_processor()  : addr{OLED_ADDR
     home_screen{oled_screen, "PICO MIDI PROCESSOR No Connected Device"},
     nav_buttons{oled_view_manager}
 {
-    gpio_init(LED_GPIO);
-    gpio_set_dir(LED_GPIO, GPIO_OUT);
+    //gpio_init(LED_GPIO);
+    //gpio_set_dir(LED_GPIO, GPIO_OUT);
 
     // Set up the button GPIO
     gpio_init(BUTTON_UP);
@@ -167,20 +169,6 @@ void rppicomidi::Pico_usb_midi_processor::poll_midi_dev_rx()
     }
 }
 
-void rppicomidi::Pico_usb_midi_processor::poll_midi_host_rx(void)
-{
-    // device must be attached and have at least one endpoint ready to receive a message
-    if (!midi_dev_addr  || !tuh_midi_configured(midi_dev_addr)) {
-        return;
-    }
-    if (tuh_midih_get_num_rx_cables(midi_dev_addr) < 1) {
-        return;
-    }
-    tuh_midi_read_poll(midi_dev_addr); // if there is data, then the callback will be called
-}
-
-
-
 void rppicomidi::Pico_usb_midi_processor::task()
 {
     if (midi_device_status == MIDI_DEVICE_NEEDS_INIT) {
@@ -230,7 +218,8 @@ void rppicomidi::Pico_usb_midi_processor::task()
     
     int64_t diff = absolute_time_diff_us(previous_timestamp, now);
     if (diff > 1000000) {
-        gpio_put(rppicomidi::Pico_usb_midi_processor::instance().LED_GPIO, led_state);
+        board_led_write(led_state);
+        //gpio_put(rppicomidi::Pico_usb_midi_processor::instance().LED_GPIO, led_state);
         led_state = !led_state;
         previous_timestamp = now;
     }
@@ -246,14 +235,13 @@ static void midi_host_app_task(void)
     if (cloning_is_required()) {
         if (rppicomidi::Pico_usb_midi_processor::instance().midi_dev_addr != 0) {
             TU_LOG1("start descriptor cloning\r\n");
-            clone_descriptors(rppicomidi::Pico_usb_midi_processor::instance().midi_dev_addr );
+            start_cloning(rppicomidi::Pico_usb_midi_processor::instance().midi_dev_addr );
         }
     }
     else if (clone_next_string_is_required()) {
         clone_next_string();
     }
     else if (descriptors_are_cloned()) {
-        rppicomidi::Pico_usb_midi_processor::instance().poll_midi_host_rx();
         tuh_midi_stream_flush(rppicomidi::Pico_usb_midi_processor::instance().midi_dev_addr );
     }
 }
@@ -263,14 +251,10 @@ void core1_main()
 {
     sleep_ms(10);
     multicore_lockout_victim_init(); // need to lockout core1 when core0 writes to flash
-    // Use tuh_configure() to pass pio configuration to the host stack
-    // Note: tuh_configure() must be called before
-    pio_usb_configuration_t pio_cfg = PIO_USB_DEFAULT_CONFIG;
-    tuh_configure(1, TUH_CFGID_RPI_PIO_USB_CONFIGURATION, &pio_cfg);
 
     // To run USB SOF interrupt in core1, init host stack for pio_usb (roothub
     // port1) on core1
-    tuh_init(1);
+    tuh_init(BOARD_TUH_RHPORT);
 
     while (true) {
         tuh_task(); // tinyusb host task
@@ -334,7 +318,7 @@ int main()
     sleep_ms(10);
 
     // direct printf to UART
-    stdio_init_all();
+    board_init();
 
     // all USB Host task run in core1
     multicore_reset_core1();    
@@ -342,6 +326,7 @@ int main()
 
     // Initialize the CLI
     EmbeddedCliConfig cli_config = {
+        .invitation = "> ",
         .rxBufferSize = 64,
         .cmdBufferSize = 64,
         .historyBufferSize = 128,
@@ -391,6 +376,12 @@ int main()
 // Invoked when device with midi interface is mounted
 void tuh_midi_mount_cb(uint8_t dev_addr, uint8_t in_ep, uint8_t out_ep, uint8_t num_cables_rx, uint16_t num_cables_tx)
 {
+#if CFG_TUSB_DEBUG < 1
+    (void)in_ep;
+    (void)out_ep;
+    (void)num_cables_rx;
+    (void)num_cables_tx;
+#endif
     TU_LOG1("MIDI device address = %u, IN endpoint %u has %u cables, OUT endpoint %u has %u cables\r\n",
         dev_addr, in_ep & 0xf, num_cables_rx, out_ep & 0xf, num_cables_tx);
 
@@ -401,6 +392,10 @@ void tuh_midi_mount_cb(uint8_t dev_addr, uint8_t in_ep, uint8_t out_ep, uint8_t 
 // Invoked when device with midi interface is un-mounted
 void tuh_midi_umount_cb(uint8_t dev_addr, uint8_t instance)
 {
+#if CFG_TUSB_DEBUG < 1
+    (void)dev_addr;
+    (void)instance;
+#endif
     rppicomidi::Pico_usb_midi_processor::instance().midi_dev_addr = 0;
     TU_LOG1("MIDI device address = %d, instance = %d is unmounted\r\n", dev_addr, instance);
     set_descriptors_uncloned();
@@ -455,9 +450,9 @@ extern "C" void main_loop_task()
 
 static scsi_inquiry_resp_t inquiry_resp;
 static FATFS fatfs[1];
-bool inquiry_complete_cb(uint8_t dev_addr, msc_cbw_t const* cbw, msc_csw_t const* csw)
+bool inquiry_complete_cb(uint8_t dev_addr, tuh_msc_complete_data_t const* cb_data)
 {
-    if (csw->status != 0) {
+    if (cb_data->csw->status != 0) {
         printf("Inquiry failed\r\n");
         return false;
     }
@@ -466,8 +461,8 @@ bool inquiry_complete_cb(uint8_t dev_addr, msc_cbw_t const* cbw, msc_csw_t const
     printf("%.8s %.16s rev %.4s\r\n", inquiry_resp.vendor_id, inquiry_resp.product_id, inquiry_resp.product_rev);
 
     // Get capacity of device
-    uint32_t const block_count = tuh_msc_get_block_count(dev_addr, cbw->lun);
-    uint32_t const block_size = tuh_msc_get_block_size(dev_addr, cbw->lun);
+    uint32_t const block_count = tuh_msc_get_block_count(dev_addr, cb_data->cbw->lun);
+    uint32_t const block_size = tuh_msc_get_block_size(dev_addr, cb_data->cbw->lun);
 
     printf("Disk Size: %lu MB\r\n", block_count / ((1024*1024)/block_size));
     printf("Block Count = %lu, Block Size: %lu\r\n", block_count, block_size);
@@ -478,17 +473,23 @@ bool inquiry_complete_cb(uint8_t dev_addr, msc_cbw_t const* cbw, msc_csw_t const
 //------------- IMPLEMENTATION -------------//
 void tuh_msc_mount_cb(uint8_t dev_addr)
 {
+    uint8_t pdrv = msc_map_next_pdrv(dev_addr);
 
-    uint8_t pdrv = dev_addr-1;
-    assert(pdrv==0);
+    assert(pdrv < FF_VOLUMES);
     msc_fat_plug_in(pdrv);
     uint8_t const lun = 0;
-    tuh_msc_inquiry(dev_addr, lun, &inquiry_resp, inquiry_complete_cb);
-    if ( f_mount(&fatfs[pdrv],"", 0) != FR_OK ) {
-        printf("mount failed\r\n");
+    tuh_msc_inquiry(dev_addr, lun, &inquiry_resp, inquiry_complete_cb, 0);
+    char path[3] = "0:";
+    path[0] += pdrv;
+    if ( f_mount(&fatfs[pdrv],path, 0) != FR_OK ) {
+        printf("mount drive %s failed\r\n", path);
         return;
     }
-    printf("core %d MassStorage device %u is mounted\r\n", get_core_num(), pdrv);
+    if (f_chdrive(path) != FR_OK) {
+        printf("f_chdrive(%s) failed\r\n", path);
+        return;
+    }
+    printf("\r\nMass Storage drive %u is mounted\r\n", pdrv);
     rppicomidi::Pico_usb_midi_processor::instance().midi_device_status = rppicomidi::Pico_usb_midi_processor::MIDI_DEVICE_MSC_ATTACHED;
 }
 

@@ -6,7 +6,7 @@ extern "C" {
 #else
 #include <stdbool.h>
 #endif
-void clone_descriptors(uint8_t dev_addr);
+void start_cloning(uint8_t dev_addr);
 void set_cloning_required();
 bool cloning_is_required();
 bool clone_next_string_is_required();

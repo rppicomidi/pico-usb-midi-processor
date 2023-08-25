@@ -27,6 +27,7 @@
 #include "tusb.h"
 #include "stdlib.h"
 #include "usb_descriptors.h"
+#include "usb_midi_host.h"
 static tusb_desc_device_t desc_device_connected;
 
 static uint8_t* desc_fs_configuration = NULL;
@@ -144,11 +145,12 @@ static void clone_langids_cb(tuh_xfer_t* xfer)
 // This function starts the process that extracts the string descriptors.
 // It assumes that captured device descriptor and configuration descriptor
 // are valid and that all string descriptor indices are available
-void clone_descriptors(uint8_t dev_addr)
+static void clone_string_descriptors(uint8_t dev_addr)
 {
   int idx, jdx;
   const uint8_t* midi_string_idxs;
   uint8_t nmidi_strings;
+  TU_LOG2("clone string descriptors for addr=%u\r\n", dev_addr);
   if (dev_addr == daddr) {
     // first free any old devstrings
     if (devstrings != NULL) {
@@ -194,10 +196,92 @@ void clone_descriptors(uint8_t dev_addr)
     // get the string langid list
     if (tuh_descriptor_get_string(daddr, 0, 0, scratchpad, SZ_SCRATCHPAD, clone_langids_cb, 0)) {
       clone_state = CLONING;
+      TU_LOG2("getting langid list\r\n");
+    }
+    else {
+      TU_LOG2("getting langid list failed\r\n");
+      clone_state = UNCLONED;
     }
   }
 }
 
+static void clone_config_cb(tuh_xfer_t* xfer)
+{
+    if (XFER_RESULT_SUCCESS == xfer->result && xfer->actual_len == xfer->user_data) {
+        // We have the configuration descriptor. Now clone the string descriptors
+        TU_LOG2("cloning the string descriptors\r\n");
+        clone_string_descriptors(xfer->daddr);
+    }
+    else {
+        TU_LOG2("failed to clone the config descriptor\r\n");
+    }
+}
+
+static void clone_config_sz_cb(tuh_xfer_t* xfer)
+{
+    if (XFER_RESULT_SUCCESS == xfer->result) {
+        TU_LOG2("clone got config size\r\n");
+        tusb_desc_configuration_t* base = (tusb_desc_configuration_t*)scratchpad;
+        desc_fs_configuration = malloc(base->wTotalLength);
+        if (!desc_fs_configuration || !tuh_descriptor_get_configuration(xfer->daddr, 0, desc_fs_configuration, base->wTotalLength,
+                            clone_config_cb, base->wTotalLength)) {
+            if (desc_fs_configuration) {
+                free(desc_fs_configuration);
+                desc_fs_configuration = NULL;
+            }
+            clone_state = UNCLONED;
+            TU_LOG2("failed to start cloning the config descriptor\r\n");
+        }
+        else {
+            TU_LOG2("cloning the configuration descriptor\r\n");
+        }
+    }
+}
+
+static void clone_device_cb(tuh_xfer_t* xfer)
+{
+    if (XFER_RESULT_SUCCESS == xfer->result) {
+        if (xfer->actual_len == sizeof(desc_device_connected) && desc_device_connected.bNumConfigurations == 1) {
+            // device descriptor copied and has exactly one configuration (all this software can handle)
+            desc_fs_configuration = calloc(desc_device_connected.bNumConfigurations, sizeof(desc_fs_configuration[0]));
+            if (!desc_fs_configuration || !tuh_descriptor_get_configuration(xfer->daddr, 0, scratchpad, sizeof(tusb_desc_configuration_t),
+                               clone_config_sz_cb, 0)) {
+                clone_state = UNCLONED;
+                TU_LOG2("failed send get config size\r\n");
+            }
+            else {
+                TU_LOG2("sent get config size\r\n");
+            }
+        }
+        else {
+            TU_LOG2("xfer->actual_len=%lu num config=%u\r\n", xfer->actual_len, desc_device_connected.bNumConfigurations);
+        }
+    }
+    else {
+        TU_LOG2("device clone cb xfer failed result=%u\r\n", xfer->result);
+    }
+}
+
+void start_cloning(uint8_t dev_addr)
+{
+    // Free any old configuration descriptors
+    if (desc_fs_configuration != NULL) {
+        free(desc_fs_configuration);
+        desc_fs_configuration = NULL;
+    }
+    daddr = dev_addr;
+    if (tuh_descriptor_get_device(dev_addr, &desc_device_connected, sizeof(desc_device_connected),
+                               clone_device_cb, 0)) {
+        clone_state = CLONING;
+        TU_LOG2("Sent get device descriptor to addr %u\r\n", dev_addr);
+    }
+    else {
+        clone_state = UNCLONED;
+        TU_LOG2("Failed send get device descriptor to addr %u\r\n", dev_addr);
+    }
+}
+
+#if 0
 // grab the device descriptor during enumeration
 void tuh_desc_device_cb(uint8_t dev_addr, const tusb_desc_device_t *desc)
 {
@@ -218,6 +302,7 @@ void tuh_desc_config_cb(uint8_t dev_addr, const tusb_desc_configuration_t *desc_
         }
     }
 }
+#endif
 
 // Invoked when received GET DEVICE DESCRIPTOR
 // Application return pointer to descriptor
@@ -241,8 +326,12 @@ uint8_t midid_get_endpoint0_size()
 // Descriptor contents must exist long enough for transfer to complete
 uint8_t const * tud_descriptor_configuration_cb(uint8_t index)
 {
-  (void) index; // for multiple configurations
-  TU_LOG2("midi device configuration returned\r\n");
+  (void) index;
+  if (desc_fs_configuration == NULL) {
+    TU_LOG2("midi device configuration %u not available\r\n", index);
+    return NULL;
+  }
+  TU_LOG2("midi device configuration %u returned\r\n", index);
   return desc_fs_configuration;
 }
 

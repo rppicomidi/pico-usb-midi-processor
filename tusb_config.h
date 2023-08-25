@@ -43,8 +43,8 @@
 #define CFG_TUH_ENABLED     1
 #define CFG_TUH_RPI_PIO_USB 1
 
-// CFG_TUSB_DEBUG is defined by compiler in DEBUG build
-// #define CFG_TUSB_DEBUG           0
+// CFG_TUSB_DEBUG is defined by family.cmake in DEBUG build
+// Override by passing LOG=[log-level] to cmake or by modifying CMakeLists.txt
 
 /* USB DMA on some MCUs can only access a specific SRAM region with restriction on alignment.
  * Tinyusb use follows macros to declare transferring memory so that they can be put
@@ -66,14 +66,15 @@
 //--------------------------------------------------------------------
 
 #ifdef CFG_TUD_ENDPOINT0_SIZE
-#error "must define CFG_TUD_ENDPOINT0_SIZE here"
+    #error "must define CFG_TUD_ENDPOINT0_SIZE here"
 #else
-extern uint8_t midid_get_endpoint0_size();
-#define CFG_TUD_ENDPOINT0_SIZE    midid_get_endpoint0_size()
-
+    #define CFG_TUD_EP0_SZ_IS_FN 1
+    #define CFG_TUD_ENDPOINT0_MAX 64
+    extern uint8_t midid_get_endpoint0_size();
+    #define CFG_TUD_ENDPOINT0_SIZE    midid_get_endpoint0_size()
 #endif
 
-#define CFG_TUD_MIDI              1
+#define CFG_TUD_MIDI              0
 #define CFG_TUD_MIDI_RX_BUFSIZE   (TUD_OPT_HIGH_SPEED ? 512 : 64)
 #define CFG_TUD_MIDI_TX_BUFSIZE   (TUD_OPT_HIGH_SPEED ? 512 : 64)
 
@@ -90,8 +91,9 @@ extern uint8_t midid_get_endpoint0_size();
 #define CFG_TUH_DEVICE_MAX          (CFG_TUH_HUB ? 4 : 1) // hub typically has 4 ports
 
 #define CFG_TUH_MSC                 1
-#define CFG_TUH_MIDI                1
+#define CFG_TUH_MIDI                0
 #define CFG_MIDI_HOST_DEVSTRINGS    1
+#define BOARD_TUH_RHPORT            1
 
 #ifdef __cplusplus
  }
