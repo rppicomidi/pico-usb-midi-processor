@@ -296,9 +296,6 @@
 /  SemaphoreHandle_t and etc. A header file for O/S definitions needs to be
 /  included somewhere in the scope of ff.h. */
 
-#ifndef PICO_USE_MALLOC_MUTEX
-#define PICO_USE_MALLOC_MUTEX 1
-#endif
 
 
 /*--- End of configuration options ---*/
