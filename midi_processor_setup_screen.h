@@ -34,7 +34,7 @@ public:
     Midi_processor_setup_screen(Mono_graphics& screen_, const Mono_mono_font& font_,
         uint8_t cable_num_, bool is_midi_in_);
     void draw() final;
-    static void select_callback(View* me, int& idx);
+    static void select_callback(View* me, int idx);
     void entry() final;
     void exit() final;
     Select_result on_select(View** new_view) final;

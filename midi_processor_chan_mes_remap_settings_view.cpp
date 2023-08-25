@@ -90,7 +90,7 @@ void rppicomidi::Midi_processor_chan_mes_remap_settings_view::draw()
     menu.draw();
 }
 
-void rppicomidi::Midi_processor_chan_mes_remap_settings_view::static_mes_type_select_callback(View* context, int& idx)
+void rppicomidi::Midi_processor_chan_mes_remap_settings_view::static_mes_type_select_callback(View* context, int idx)
 {
     auto me = reinterpret_cast<Midi_processor_chan_mes_remap_settings_view*>(context);
     auto remap_proc = reinterpret_cast<Midi_processor_chan_mes_remap*>(me->proc);
@@ -119,6 +119,9 @@ void rppicomidi::Midi_processor_chan_mes_remap_settings_view::static_toggle_disp
         // then there are remap items to change format
         int ret = me->menu.set_current_item_idx(idx);
         assert(ret == idx);
+        #ifdef NDEBUG
+        (void)ret;
+        #endif
         auto item = reinterpret_cast<Bimap_spinner_menu_item<uint8_t>*>(me->menu.get_current_item());
         item->set_display_hex(is_hex);
     }

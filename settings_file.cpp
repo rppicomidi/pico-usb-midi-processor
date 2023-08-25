@@ -20,10 +20,15 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+// Make asserts work correctly, even for release builds
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
 #include <assert.h>
 #include "settings_file.h"
 #include "midi_processor_manager.h"
 #include "rp2040_rtc.h"
+
 rppicomidi::Settings_file::Settings_file() : vid{0}, pid{0}
 {
     // Make sure the flash filesystem is working
@@ -324,7 +329,7 @@ FRESULT rppicomidi::Settings_file::backup_all_presets()
             }
             flash_file_directory_ok = true;
         }
-        char* raw_settings;
+        char* raw_settings = nullptr;
         if(info.type == LFS_TYPE_REG) {
             int nread = load_settings_string(info.name, &raw_settings, false);
             if (nread > 0) {
@@ -347,7 +352,9 @@ FRESULT rppicomidi::Settings_file::backup_all_presets()
                 printf("backed up preset 0:%s/%s/%s\r\n", base_preset_path, dirname, info.name);
             }
             else {
-                delete[] raw_settings;
+                if (raw_settings) {
+                    delete[] raw_settings;
+                }
                 lfs_dir_close(&dir);
                 pico_unmount();
                 return FR_INT_ERR;

@@ -75,7 +75,7 @@ void rppicomidi::Midi_processor_setup_screen::draw()
     menu.draw();
 }
 
-void rppicomidi::Midi_processor_setup_screen::select_callback(rppicomidi::View* view, int& idx)
+void rppicomidi::Midi_processor_setup_screen::select_callback(rppicomidi::View* view, int idx)
 {
     auto me = reinterpret_cast<Midi_processor_setup_screen*>(view);
     auto newview = Midi_processor_manager::instance().add_new_midi_processor_by_idx(idx, me->cable_num, me->is_midi_in);

@@ -54,7 +54,7 @@ public:
     void on_decrement(uint32_t delta, bool is_shifted) final {menu.on_decrement(delta, is_shifted); };
     void on_left(uint32_t delta, bool is_shifted) final; // delete the selected element or select the left bimap
     void on_right(uint32_t delta, bool is_shifted) final {menu.on_right(delta, is_shifted); };
-    static void static_mes_type_select_callback(View* context, int& idx);
+    static void static_mes_type_select_callback(View* context, int idx);
     static void static_toggle_display_format(View* context, View**);
     static void static_new_remap_callback(View* context, View**);
     static Midi_processor_settings_view* static_make_new(Mono_graphics& screen_, const Rectangle& rect_, Midi_processor* proc_)

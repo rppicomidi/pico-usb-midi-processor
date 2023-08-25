@@ -41,7 +41,7 @@ public:
         strncpy(name, name_, max_name_length);
         name[max_name_length] = '\0';
         snprintf(unique_name, max_name_length+5,"%s$%u",name_, unique_id_);
-        name[max_name_length+5]='\0';
+        unique_name[max_name_length+5]='\0';
         if (has_feedback_process()) {
             snprintf(feedback_name,max_name_length+8,"fb-%s", unique_name);
             feedback_name[max_name_length+8] = '\0';

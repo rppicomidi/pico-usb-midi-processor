@@ -442,7 +442,7 @@ bool rppicomidi::Midi_processor_manager::deserialize(char* json_format)
                                 const char* proc_label = json_object_get_name(proc_objects, proc_idx);
                                 const size_t proc_label_len = strlen(proc_label);
                                 assert(proc_label_len > 0);
-                                char proc_type_label[proc_label_len];
+                                char proc_type_label[proc_label_len+1];
                                 strcpy(proc_type_label, proc_label);
                                 char* dollar_ptr = strrchr(proc_type_label,'$');
                                 if (dollar_ptr != nullptr)
@@ -485,7 +485,7 @@ bool rppicomidi::Midi_processor_manager::deserialize(char* json_format)
                                 const char* proc_label = json_object_get_name(proc_objects, proc_idx);
                                 const size_t proc_label_len = strlen(proc_label);
                                 assert(proc_label_len > 0);
-                                char proc_type_label[proc_label_len];
+                                char proc_type_label[proc_label_len+1];
                                 strcpy(proc_type_label, proc_label);
                                 char* dollar_ptr = strrchr(proc_type_label,'$');
                                 if (dollar_ptr != nullptr)
