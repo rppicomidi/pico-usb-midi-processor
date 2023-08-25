@@ -1,0 +1,74 @@
+From e449b250d1ec15a7e34f97749b60e9f74f309c9c Mon Sep 17 00:00:00 2001
+From: rppicomidi <rppicomidi@gmail.com>
+Date: Mon, 21 Aug 2023 12:09:03 -0700
+Subject: [PATCH] Allow defining CFG_TUD_ENDPOINT0_SIZE as a function
+
+---
+ src/device/usbd_control.c |  6 +++++-
+ src/tusb_option.h         | 25 +++++++++++++++++++++++--
+ 2 files changed, 28 insertions(+), 3 deletions(-)
+
+diff --git a/src/device/usbd_control.c b/src/device/usbd_control.c
+index 76d062e40..ae5f48c22 100644
+--- a/src/device/usbd_control.c
++++ b/src/device/usbd_control.c
+@@ -56,7 +56,11 @@ typedef struct
+ tu_static usbd_control_xfer_t _ctrl_xfer;
+ 
+ CFG_TUD_MEM_SECTION CFG_TUSB_MEM_ALIGN
+-tu_static uint8_t _usbd_ctrl_buf[CFG_TUD_ENDPOINT0_SIZE];
++#if CFG_TUD_EP0_SZ_IS_FN
++  tu_static uint8_t _usbd_ctrl_buf[CFG_TUD_ENDPOINT0_MAX];
++#else
++  tu_static uint8_t _usbd_ctrl_buf[CFG_TUD_ENDPOINT0_SIZE];
++#endif
+ 
+ //--------------------------------------------------------------------+
+ // Application API
+diff --git a/src/tusb_option.h b/src/tusb_option.h
+index c72117850..6e9b9e896 100644
+--- a/src/tusb_option.h
++++ b/src/tusb_option.h
+@@ -333,7 +333,24 @@
+   #define CFG_TUD_MEM_ALIGN       CFG_TUSB_MEM_ALIGN
+ #endif
+ 
++// You can define CFG_TUD_ENDPOINT0_SIZE to be a function that returns uint8_t
++// if CFG_TUD_EP0_SZ_IS_FN is not zero. If you do that, you must define
++// CFG_TUD_ENDPOINT0_MAX, the size of the EP0 buffer, to a constant positive integer <= 64
++#ifndef CFG_TUD_EP0_SZ_IS_FN
++  #define CFG_TUD_EP0_SZ_IS_FN 0
++#else
++  #ifndef CFG_TUD_ENDPOINT0_MAX
++    #error Must define CFG_TUD_ENDPOINT0_MAX if CFG_TUD_EP0_SZ_IS_FN != 0
++  #endif
++#endif
++
++// CFG_TUD_ENDPOINT0_SIZE is the maximum EP0 transfer size. Normally defined
++// as a constant 8 <= CFG_TUD_ENDPOINT0_SIZE <= 64, but can
++// be defined as a function that returns uint8_t for special purposes.
+ #ifndef CFG_TUD_ENDPOINT0_SIZE
++  #if CFG_TUD_EP0_SZ_IS_FN
++    #error Must define CFG_TUD_ENDPOINT0_SIZE if CFG_TUD_EP0_SZ_IS_FN==1
++  #endif
+   #define CFG_TUD_ENDPOINT0_SIZE  64
+ #endif
+ 
+@@ -484,8 +501,12 @@
+ //------------------------------------------------------------------
+ // Configuration Validation
+ //------------------------------------------------------------------
+-#if CFG_TUD_ENDPOINT0_SIZE > 64
+-  #error Control Endpoint Max Packet Size cannot be larger than 64
++#if !CFG_TUD_EP0_SZ_IS_FN
++  #if CFG_TUD_ENDPOINT0_SIZE > 64
++    #error Control Endpoint Max Packet Size cannot be larger than 64
++  #endif
++  #elif CFG_TUD_ENDPOINT0_MAX > 64
++    #error Control Endpoint Max Packet Size cannot be larger than 64
+ #endif
+ 
+ // To avoid GCC compiler warnings when -pedantic option is used (strict ISO C)
+-- 
+2.34.1
+
