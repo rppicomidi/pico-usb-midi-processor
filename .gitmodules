@@ -13,3 +13,9 @@
 [submodule "ext_lib/embedded-cli"]
 	path = ext_lib/embedded-cli
 	url = https://github.com/funbiscuit/embedded-cli
+[submodule "lib/usb_midi_dev_ac_optional"]
+	path = lib/usb_midi_dev_ac_optional
+	url = https://github.com/rppicomidi/usb_midi_dev_ac_optional
+[submodule "lib/usb_midi_host"]
+	path = lib/usb_midi_host
+	url = https://github.com/rppicomidi/usb_midi_host
