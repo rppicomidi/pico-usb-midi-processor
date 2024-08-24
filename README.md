@@ -113,6 +113,41 @@ handy for debug. Because the USB host uses Pico pins 1 and 2, I use
 Pico pins 21 and 22 for the debug UART. The SWCLK, GND and SWDIO pins
 on the bottom of the board wire to the corresponding pins on the Pico Probe.
 
+## A more costly, but easier build circuit
+
+If soldering all of those wires seems like too much, you can use the
+[Adafruit RP2040 Feather with USB A Host](https://learn.adafruit.com/adafruit-feather-rp2040-with-usb-type-a-host/overview) board instead
+of a Pico board and a USB A breakout board and you can use a breakout
+board with a 5-way navigation switch plus two buttons, plus the OLED
+breakout board. Then you can easily wire it up on a breadboard.
+
+![](doc/PUMP_adafruit_breadboard.jpg).
+
+In that photo, the SET button is the Back button and the RST button is the
+Shift button. Pressing the nav switch straight down grounds the MID pin,
+and performs the ENTER function. For those curious, I used
+[this board](https://www.amazon.com/ACEIRMC-5-Channel-Direction-Navigation-Independent/dp/B09DPMQ1F3?ref_=ast_sto_dp) in the photo. To get it to look like the photo,
+I had to remove the pre-soldered header and solder in straight
+pins. If I had to do it over again, I would have used a cable
+with female headers on one end and pin headers on the other
+to wire to the breadboard.
+
+The `CMakeFiles.txt` file is set up to assume you wired it as
+follows:
+OLED VCC->Feather board 3.3V
+OLED BOARD GND->Feather board GND
+OLED SDA->Feather board SDA pin
+OLED SCL->Feather board SCL pin
+SHIFT Button->Feather board D5 pin
+BACK Button->Feather board D6 pin
+ENTER Button->Feather board D9 pin
+RIGHT Button->Feather board D10 pin
+LEFT Button->Feather board D11 pin
+DOWN Button->Feather board D12 pin
+UP Button->Feather board D13 pin
+Button board COM->Feather board GND
+UART adapter Rx and Tx to Feather Board Tx and Rx
+
 # Software Build Instructions
 ## Set up your environment
 
@@ -120,13 +155,11 @@ The PUMP project uses original code plus a lot of code from other
 projects on GitHub. Most are git submodules. All code is written
 in C, C++, or the RP2040's PIO state machine assembly code. To
 build it, you need to install the Pico C SDK version 1.5.1 or later.
-Install this code plus the compiler toolchain per the instructions 
-in the [Getting Started with Raspberry Pi Pico C/C++ development](https://datasheets.raspberrypi.com/pico/getting-started-with-pico.pdf)
-document Chapter 2. Unless you are using a Raspberry Pi for development,
-you will need to follow the additional instructions in chapter 9 of the
-same document. I recommend setting up Microsoft VS Code as described in
-chapter 7, and I recommend installing OpenOCD and building a Picoprobe as
-described in Appendix A for debugging and code development.
+The environment is a bit simpler to set up using Pico SDK version 2.0.
+Before you attempt to build this project, please set up and build the
+[pico-usb-midi-filter](https://github.com/rppicomidi/pico-usb-midi-filter?tab=readme-ov-file#software) as described in the linked Software section
+of the `README.md` file. That section describes how to set up the
+SDK, and patch the TinyUSB library.
 
 ## Install and build the project source code
 ### Preview
@@ -152,8 +185,7 @@ Some original library code includes
 - pico-ssd1306-mono-graphics-lib, a higher performance C++ SSD1306
 graphics library than others I tried. It supports screen capture to BMP,
 which makes documentation a bit simpler. It also supports multiple
-displays at once, which is useful for a future hardware attachment
-I have planned for this project.
+displays at once, which is useful for [this project](https://github.com/rppicomidi/pico-mc-display-bridge).
 - pico-mono-ui-lib, a C++ UI library that supports multi-line menus
 with scrolling, multi-screen navigation, the UI buttons, and
 setting template classes that know how to serialize to JSON and deserialize
@@ -168,7 +200,7 @@ $PICO_DIR
     |   |
     |   +--lib
     |       |
-    |       +--tinyusb (from my forked code)
+    |       +--tinyusb (patched)
     |           |
     |          ...
     |           |
@@ -183,7 +215,7 @@ $PICO_DIR
     |                   +--raspberry_pi
     |                       |
     |                       +--Pico-PIO-USB (need to force
-    |                           this to install using a Python script)
+    |                           this to install)
     |
     +--pico-usb-midi-processor
         |
@@ -211,54 +243,37 @@ $PICO_DIR
             |
             +--ssd1306 (a font library)
 ```
-Note: previous revisions of this project used my forked version
-of TinyUSB. Keeping this fork up to date has proved to be
-cumbersome. If you are updating from a previous version of this
-project, start by reverting your TinyUSB library to the regular
-release from the TinyUSB GitHub repository. This code now uses an
-application device driver, and application host driver, some
-newer TinyUSB functions that are standard now, and one patch.
 
-### Step By Step
+
+### Installing and building the Project Source Code
+
+These instructions assume you have already been able to build the
+`pico-usb-midi-filter` project to test the toolchain and the
+patched version of TinyUSB.
 
 To install on a Linux build host, use the following command line
-commands. (A Mac Homebrew installation should use the same instructions;
-I have no idea on a PC). `$PICO_DIR` refers to the some top level directory where
+commands. `${PICO_DIR}` refers to the some top level directory where
 you are are storing your Raspberry Pi Pico source code.
 
 ```
-cd $PICO_DIR
+cd ${PICO_DIR}
 
 # get the project source code and the library submodules
 git clone https://github.com/rppicomidi/pico-usb-midi-processor.git
 git submodule update --recursive --init
-
-# make sure you have the latest Pico C SDK
-cd ${PICO_SDK_PATH}
-git pull
-# get the latest verson of the tinyusb library with application host driver support
-cd lib/tinyusb
-git pull
-# get the Pico-PIO-USB project into the source tree
-python3 tools/get_deps.py rp2040
-git apply 0001-Allow-defining-CFG_TUD_ENDPOINT0_SIZE-as-a-function.patch
 ```
-
-To build on a Linux build host, use the following command line
-commands. (A Mac Homebrew installation should use the same instructions;
-I have no idea on a PC). `$PICO_DIR` refers to the some top level directory
-where you are are storing your Raspberry Pi Pico source code.
-```
-export PICO_SDK_PATH=${PICO_DIR}/pico-sdk/
-cd ${PICO_DIR}/pico-usb-midi-processor
-mkdir build
-cd build
-cmake ..
-make
-```
+To do a command line build, follow the same workflow as the
+`pico-usb-midi-filter` project. Make sure to set the `PICO_BOARD`
+CMake variable in the CMake command line to match your hardware.
 
 Building using VS Code should be straightforward because I put a
-`.vscode` directory in with the project.
+`.vscode` directory in with the project. If you are using the
+Raspberry Pi Pico extension for VS Code, click on the Pico icon
+in the left window and import the project. It should import cleanly.
+Don't forget to set the `PICO_BOARD` variable in the CMake Configuration settings.
+
+Whether building on the command line or using VS Code, please note that
+the supported values of `PICO_BOARD` are `pico` and `adafruit_feather_rp2040_usb_host`.
 
 # Operating Instructions
 
@@ -467,9 +482,7 @@ note number. If the Halfstep delta value is negative,
 then the processor will subtract halfsteps from the
 note number. You can view the min and max note numbers
 in Decimal or Hex format in the settings screen.
-- More processors are coming. I have not gotten to them
-yet.
-
-# Revision History
-18-November-2022: PUMP repo goes public. All documented features function.
-More MIDI processors are coming. Still need to make an enclosure for it.
+- More processors are possible. If you made one yourself,
+please file a pull request and I will consider adding it.
+If you have a specific request, please file an issue and
+I will try to get to it if I have time.

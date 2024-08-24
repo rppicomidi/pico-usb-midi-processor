@@ -18,7 +18,7 @@
     },
     "cmake.buildBeforeRun": true,
     "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
-    "cortex-debug.variableUseNaturalFormat": true,
+    "cortex-debug.variableUseNaturalFormat": false,
     "files.associations": {
         "limits": "c",
         "new": "c",
@@ -84,5 +84,8 @@
         "iostream": "cpp",
         "thread": "cpp",
         "variant": "cpp"
-    }
+    },
+    "cmake.configureArgs": [
+        "-DPICO_BOARD=pico"
+    ]
 }

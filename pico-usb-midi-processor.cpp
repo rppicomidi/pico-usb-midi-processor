@@ -55,6 +55,12 @@
 #include "diskio.h"
 #include "rp2040_rtc.h"
 #include "clock_set_view.h"
+#ifndef OLED_SCL_GPIO
+#define OLED_SCL_GPIO 19
+#endif
+#ifndef OLED_SDA_GPIO
+#define OLED_SDA_GPIO 18
+#endif
 namespace rppicomidi {
 class Pico_usb_midi_processor {
 public:
@@ -83,8 +89,6 @@ public:
     uint8_t addr[1];                // the OLED I2C address is stored here
     const uint8_t MUX_ADDR=0;       // no I2C mux
     uint8_t* mux_map=nullptr;       // no I2C mux
-    const uint8_t OLED_SCL_GPIO = 19;   // The OLED SCL pin
-    const uint8_t OLED_SDA_GPIO = 18;   // The OLED SDA pin
 
     // the i2c driver object
     Ssd1306i2c i2c_driver_oled{i2c1, addr, OLED_SDA_GPIO, OLED_SCL_GPIO, sizeof(addr), MUX_ADDR, mux_map};
@@ -155,10 +159,35 @@ rppicomidi::Pico_usb_midi_processor::Pico_usb_midi_processor()  : addr{OLED_ADDR
 
 void rppicomidi::Pico_usb_midi_processor::poll_midi_dev_rx()
 {
+    static bool inSysEx = false;
     // device must be attached and have at least one endpoint ready to receive a message
     uint8_t packet[4];
     while (tud_midi_packet_read(packet)) {
         uint8_t cable = Midi_processor::get_cable_num(packet);
+        if (cable == 0) {
+          if (packet[1] == 0xf0) {
+            inSysEx = true;
+          }
+          if (inSysEx) {
+            uint8_t nPrint = 3;
+            if (packet[3] == 0xf7) {
+                inSysEx = false;
+            }
+            else if (packet[2] == 0xf7) {
+                nPrint = 2;
+            }
+            else if (packet[1] == 0xf7) {
+                nPrint = 1;
+            }
+            for (uint8_t idx = 1; idx <= nPrint; idx++) {
+                printf("%02x ", packet[idx]);
+            }
+            if (!inSysEx) {
+                printf("\r\n");
+            }
+          }
+
+        }
         if (Midi_processor_manager::instance().filter_midi_out(cable, packet)) {
             tuh_midi_packet_write(rppicomidi::Pico_usb_midi_processor::instance().midi_dev_addr, packet);
         }
@@ -307,9 +336,6 @@ static void screenshot(EmbeddedCli* cli, char* args, void* context)
 // core0: handle device events
 int main()
 {
-    // default 125MHz is not appropreate. Sysclock should be multiple of 12MHz.
-    set_sys_clock_khz(120000, true);
-
     sleep_ms(10);
 
     // direct printf to UART
