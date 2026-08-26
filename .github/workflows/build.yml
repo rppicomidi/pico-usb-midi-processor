@@ -1,0 +1,75 @@
+name: build firmware
+
+on:
+  push:
+    tags:
+      - v*.**
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build-and-upload:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-none-eabi
+          
+      - name: Install Pico SDK, TinyUSB dependencies, and patch TinyUSB
+        run: |
+          pushd $HOME
+          git clone https://github.com/raspberrypi/pico-sdk.git
+          cd pico-sdk
+          git checkout 2.3.0
+          git submodule update --init --recursive
+          cd lib/tinyusb
+          python3 tools/get_deps.py rp2040
+          git apply ${GITHUB_WORKSPACE}/tinyusb-patches/0001-Allow-defining-CFG_TUD_ENDPOINT0_SIZE-as-a-function.patch
+      - name: Build
+        run: |
+          export PICO_SDK_PATH=$HOME/pico-sdk
+          export PATH=$PICO_SDK_PATH/tools:$PATH
+          mkdir build
+          cd build
+          cmake -DPICO_BOARD=pico ..
+          make
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          path: firmware/build/*.uf2
+
+  publish:
+    name: Publish firmware
+    # only create a release if a tag was created that is called e.g. v1.2.3
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    needs:  build-and-upload
+    steps:
+      - uses: actions/checkout@v4
+      - uses: FranzDiebold/github-env-vars-action@v2
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref }}
+          name: Release ${{ env.CI_REF_NAME }}
+          body: |
+            ${{ env.CI_REPOSITORY_NAME }} twist4 firmware ${{ env.CI_REF_NAME }}
+          draft: false
+          prerelease: false
+      - uses: actions/download-artifact@v4
+        with:
+          path: _artifacts
+      - name: Upload release assets
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: _artifacts/**/*.uf2
+          tag: ${{ github.ref }}
+          file_glob: true
