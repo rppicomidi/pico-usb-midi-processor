@@ -3,8 +3,8 @@
 
 void rppicomidi::Clock_set_view::entry()
 {
-    Rp2040_rtc::instance().get_date(year, month, day);
-    Rp2040_rtc::instance().get_time(hour, minute, second);
+    Rp2xxx_rtc::instance().get_date(year, month, day);
+    Rp2xxx_rtc::instance().get_time(hour, minute, second);
 }
 
 void rppicomidi::Clock_set_view::draw_field(uint8_t field_idx_, bool selected_)
@@ -135,7 +135,7 @@ void rppicomidi::Clock_set_view::on_increment(uint32_t delta, bool is_shifted)
             }
             break;
         case day_idx:
-            if (day < Rp2040_rtc::instance().get_max_days_for_month(year, month)) {
+            if (day < Rp2xxx_rtc::instance().get_max_days_for_month(year, month)) {
                 ++day;
             }
             break;
@@ -218,15 +218,15 @@ rppicomidi::View::Select_result rppicomidi::Clock_set_view::on_select(View** new
 {
     (void)new_view;
     if (item_idx == ok_idx) {
-        uint8_t maxday = Rp2040_rtc::instance().get_max_days_for_month(year, month);
+        uint8_t maxday = Rp2xxx_rtc::instance().get_max_days_for_month(year, month);
         if (day > maxday) {
             day = maxday;
             item_idx = day_idx;
             draw();
         }
         else {
-            if (Rp2040_rtc::instance().set_date(year, month, day)) {
-                if (Rp2040_rtc::instance().set_time(hour, minute, second)) {
+            if (Rp2xxx_rtc::instance().set_date(year, month, day)) {
+                if (Rp2xxx_rtc::instance().set_time(hour, minute, second)) {
                     return Select_result::exit_view;
                 }
                 else {

@@ -26,7 +26,7 @@
 #pragma once
 
 #include "view.h"
-#include "rp2040_rtc.h"
+#include "rp2xxx_rtc.h"
 #include "mono_graphics_lib.h"
 #include "view_manager.h"
 namespace rppicomidi

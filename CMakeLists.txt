@@ -21,7 +21,7 @@ add_executable(midi_processor)
 pico_enable_stdio_uart(midi_processor 1) 
 
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/ext_lib/fatfs/source)
-add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/lib/rp2040_rtc)
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/lib/rp2xxx_rtc_lib)
 target_sources(midi_processor PRIVATE
  pico-usb-midi-processor.cpp
  usb_descriptors.c
@@ -86,6 +86,6 @@ target_include_directories(midi_processor PRIVATE
 
 target_link_libraries(midi_processor PRIVATE pico_stdlib pico_multicore hardware_pio hardware_dma
 tinyusb_board tinyusb_device tinyusb_host tinyusb_pico_pio_usb usb_midi_host_app_driver usb_midi_device_app_driver
-ssd1306 ssd1306i2c text_box mono_graphics_lib ui_menu ui_view_manager ui_nav_buttons ui_text_item_chooser littlefs-lib rp2040_rtc msc_fatfs)
+ssd1306 ssd1306i2c text_box mono_graphics_lib ui_menu ui_view_manager ui_nav_buttons ui_text_item_chooser littlefs-lib rp2xxx_rtc msc_fatfs)
 pico_add_extra_outputs(midi_processor)
 

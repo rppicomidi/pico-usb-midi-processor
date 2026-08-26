@@ -264,6 +264,7 @@ private:
     static void static_fatfs_backup(EmbeddedCli* cli, char* args, void*);
     static void static_fatfs_restore(EmbeddedCli* cli, char* args, void*);
     static void static_fatfs_save_screenshots(EmbeddedCli*, char*, void*);
+    static void static_date_time(EmbeddedCli*, char* args, void*);
     FRESULT scan_files(const char* path);
     void print_fat_time(WORD wtime);
     void print_fat_date(WORD wtime);

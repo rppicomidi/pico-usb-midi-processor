@@ -27,7 +27,7 @@
 #include <assert.h>
 #include "settings_file.h"
 #include "midi_processor_manager.h"
-#include "rp2040_rtc.h"
+#include "rp2xxx_rtc.h"
 
 rppicomidi::Settings_file::Settings_file() : vid{0}, pid{0}
 {
@@ -53,76 +53,95 @@ rppicomidi::Settings_file::Settings_file() : vid{0}, pid{0}
 
 void rppicomidi::Settings_file::add_all_cli_commands(EmbeddedCli *cli)
 {
-    assert(embeddedCliAddBinding(cli, {
+    bool result = embeddedCliAddBinding(cli, {
         "format",
         "format settings file system",
         false,
         this,
         static_file_system_format
-    }));
-    assert(embeddedCliAddBinding(cli, {
+    });
+    assert(result);
+    result = embeddedCliAddBinding(cli, {
         "fsstat",
         "display settings file system status",
         false,
         this,
         static_file_system_status
-    }));
-    assert(embeddedCliAddBinding(cli, {
+    });
+    assert(result);
+    result = embeddedCliAddBinding(cli, {
         "ls",
         "list all settings files",
         true,
         this,
         static_list_files
-    }));
-    assert(embeddedCliAddBinding(cli, {
+    });
+    assert(result);
+    result = embeddedCliAddBinding(cli, {
         "cat",
         "print file contents. usage: cat <fn>",
         true,
         this,
         static_print_file
-    }));
-    assert(embeddedCliAddBinding(cli, {
+    });
+    assert(result);
+    result = embeddedCliAddBinding(cli, {
         "rm",
         "delete. usage: rm <fn>",
         true,
         this,
         static_delete_file
-    }));
-    assert(embeddedCliAddBinding(cli, {
+    });
+    assert(result);
+    result = embeddedCliAddBinding(cli, {
         "fatcd",
         "change current directory. usage: fatcd <path>",
         true,
         this,
         static_fatfs_cd
-    }));
-    assert(embeddedCliAddBinding(cli, {
+    });
+    assert(result);
+    result = embeddedCliAddBinding(cli, {
         "fatls",
         "list current directory. usage: fatls",
         false,
         this,
         static_fatfs_ls
-    }));
-    assert(embeddedCliAddBinding(cli, {
+    });
+    assert(result);
+    result = embeddedCliAddBinding(cli, {
         "backup",
         "backup current presets. usage: backup",
         false,
         this,
         static_fatfs_backup
-    }));
-    assert(embeddedCliAddBinding(cli, {
+    });
+    assert(result);
+    result = embeddedCliAddBinding(cli, {
         "restore",
         "restore presets from back. usage: restore [path] or restore [path to one file]",
         true,
         this,
         static_fatfs_restore
-    }));
-    assert(embeddedCliAddBinding(cli, {
+    });
+    assert(result);
+    result = embeddedCliAddBinding(cli, {
         "save-screenshots",
         "saves screenshots already stored internally to flash",
         false,
         this,
         static_fatfs_save_screenshots
-    }));
+    });
+    assert(result);
+    result = embeddedCliAddBinding(cli, {
+        "datetime",
+        "set the current date and time (mm dd yyyy HH:MM:SS)",
+        true,
+        this,
+        static_date_time
+    });
+    assert(result);
+    (void)result;
 }
 
 void rppicomidi::Settings_file::set_vid_pid(uint16_t vid_, uint16_t pid_)
@@ -233,7 +252,7 @@ bool rppicomidi::Settings_file::get_next_backup_directory_name(char* dirname, si
         return false; // need to at least be able to access the root directory
     uint8_t month, day;
     uint16_t year;
-    Rp2040_rtc::instance().get_date(year, month, day);
+    Rp2xxx_rtc::instance().get_date(year, month, day);
     sprintf(dirname, "%02u-%02u-%04u", month, day, year);
     FRESULT res = f_chdir(base_preset_path);
     if (res == FR_NO_PATH)
@@ -1108,8 +1127,8 @@ bool rppicomidi::Settings_file::save_screenshot(const uint8_t* bmp, const int nb
     }
     uint16_t year;
     uint8_t month, day, hour, minute, second;
-    Rp2040_rtc::instance().get_date(year, month, day);
-    Rp2040_rtc::instance().get_time(hour, minute, second);
+    Rp2xxx_rtc::instance().get_date(year, month, day);
+    Rp2xxx_rtc::instance().get_time(hour, minute, second);
     char path[128];
     snprintf(path, sizeof(path)-1, "%s/PUMP%02u%02u%04u%02u%02u%02u.bmp", base_screenshot_path, month, day, year, hour, minute, second);
     path[sizeof(path)-1] = '\0';
@@ -1232,4 +1251,28 @@ FRESULT rppicomidi::Settings_file::export_all_screenshots()
     }
     pico_unmount();
     return FR_OK;
+}
+
+void rppicomidi::Settings_file::static_date_time(EmbeddedCli*, char* args, void*)
+{
+    uint16_t year;
+    uint8_t month, day, hour, minute, second;
+    Rp2xxx_rtc::instance().get_date(year, month, day);
+    Rp2xxx_rtc::instance().get_time(hour, minute, second);
+    printf("Time was: %02d/%02d/%04d %02d:%02d:%02d\r\n", month, day, year, hour, minute, second);
+    uint16_t argc = embeddedCliGetTokenCount(args);
+    if (argc == 6) {
+        month = atoi(embeddedCliGetToken(args, 1));
+        day = atoi(embeddedCliGetToken(args, 2));
+        year = atoi(embeddedCliGetToken(args, 3));
+        hour = atoi(embeddedCliGetToken(args, 4));
+        minute = atoi(embeddedCliGetToken(args, 5));
+        second = atoi(embeddedCliGetToken(args, 6));
+        Rp2xxx_rtc::instance().set_date(year, month, day);
+        Rp2xxx_rtc::instance().set_time(hour, minute, second);
+        printf("New Time: %02d/%02d/%04d %02d:%02d:%02d\r\n", month, day, year, hour, minute, second);
+    }
+    else if (argc !=0) {
+        printf("usage: datetime mm dd yyyy HH:MM:SS");
+    }
 }

@@ -19,3 +19,6 @@
 [submodule "lib/usb_midi_host"]
 	path = lib/usb_midi_host
 	url = https://github.com/rppicomidi/usb_midi_host
+[submodule "lib/rp2xxx_rtc_lib"]
+	path = lib/rp2xxx_rtc_lib
+	url = https://github.com/rppicomidi/rp2xxx_rtc_lib.git

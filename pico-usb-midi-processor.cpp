@@ -53,7 +53,7 @@
 #include "embedded_cli.h"
 #include "ff.h"
 #include "diskio.h"
-#include "rp2040_rtc.h"
+#include "rp2xxx_rtc.h"
 #include "clock_set_view.h"
 #ifndef OLED_SCL_GPIO
 #define OLED_SCL_GPIO 19
@@ -351,7 +351,7 @@ int main()
         .rxBufferSize = 64,
         .cmdBufferSize = 64,
         .historyBufferSize = 128,
-        .maxBindingCount = 11,
+        .maxBindingCount = 12,
         .cliBuffer = NULL,
         .cliBufferSize = 0,
         .enableAutoComplete = true,
@@ -376,7 +376,9 @@ int main()
         .context = NULL,
         .binding = screenshot
     };
-    assert(embeddedCliAddBinding(cli, ss));
+    bool result = embeddedCliAddBinding(cli, ss);
+    assert(result);
+    (void)result;
     while (1) {
         instance_ptr->task();
         // update the CLI if need be
