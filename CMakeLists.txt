@@ -18,7 +18,7 @@ add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/lib/usb_midi_dev_ac_optional)
 set(EMBEDDED_CLI_PATH ${CMAKE_CURRENT_LIST_DIR}/ext_lib/embedded-cli/lib/)
 add_executable(midi_processor)
 
-pico_enable_stdio_uart(midi_processor 1) 
+pico_enable_stdio_uart(midi_processor 1)
 
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/ext_lib/fatfs/source)
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/lib/rp2xxx_rtc_lib)
@@ -35,6 +35,8 @@ target_sources(midi_processor PRIVATE
  midi_processor_transpose_view.cpp
  midi_processor_chan_mes_remap.cpp
  midi_processor_chan_mes_remap_settings_view.cpp
+ midi_processor_raw_remap.cpp
+ midi_processor_raw_remap_view.cpp
  preset_view.cpp
  clock_set_view.cpp
  backup_view.cpp

@@ -28,6 +28,8 @@
 #include "midi_processor_mc_fader_pickup_settings_view.h"
 #include "midi_processor_transpose_view.h"
 #include "midi_processor_chan_mes_remap_settings_view.h"
+#include "midi_processor_raw_remap.h"
+#include "midi_processor_raw_remap_view.h"
 
 uint16_t rppicomidi::Midi_processor_manager::unique_id = 0;
 rppicomidi::Midi_processor_manager::Midi_processor_manager() : screen{nullptr}, current_preset{"current preset",1,8,1}, dirty{true}
@@ -42,6 +44,10 @@ rppicomidi::Midi_processor_manager::Midi_processor_manager() : screen{nullptr}, 
                         Midi_processor_chan_mes_remap_settings_view::static_make_new});
     proclist.push_back({Midi_processor_chan_button_remap::static_getname(), Midi_processor_chan_button_remap::static_make_new,
                         Midi_processor_chan_mes_remap_settings_view::static_make_new});
+    proclist.push_back({Midi_processor_raw_remap::static_getname(), Midi_processor_raw_remap::static_make_new,
+                        Midi_processor_raw_remap_view::static_make_new});
+                        *id_str = '\0';
+
     *id_str = '\0';
     *prod_str = '\0';
     Settings_file::instance(); // construct the Settings_file instance
