@@ -31,7 +31,7 @@ jobs:
           git submodule update --init --recursive
           cd lib/tinyusb
           python3 tools/get_deps.py rp2040
-          git apply ${GITHUB_WORKSPACE}/tinyusb-patches/0001-Allow-defining-CFG_TUD_ENDPOINT0_SIZE-as-a-function.patch
+          git apply ${GITHUB_WORKSPACE}/tinyusb_patches/0001-Allow-defining-CFG_TUD_ENDPOINT0_SIZE-as-a-function.patch
       - name: Build
         run: |
           export PICO_SDK_PATH=$HOME/pico-sdk
