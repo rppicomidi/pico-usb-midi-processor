@@ -410,7 +410,7 @@ FRESULT rppicomidi::Settings_file::restore_one_file(const char* fullpath, const 
     }
     int error_code = pico_mount(false);
     if (error_code != 0) {
-        free((void*)buffer);
+        delete[] buffer;
         printf("unexpected error %s mounting flash\r\n", pico_errmsg(error_code));
         return FR_INT_ERR;
     }
@@ -422,7 +422,7 @@ FRESULT rppicomidi::Settings_file::restore_one_file(const char* fullpath, const 
         localfile = pico_open(filename, LFS_O_WRONLY | LFS_O_CREAT);
         if (localfile < 0) {
             printf("error %s creating %s for writing\r\n", pico_errmsg(localfile), filename);
-            free((void*)buffer);
+            delete[] buffer;
             pico_unmount();
             return FR_INT_ERR;
         }
@@ -432,7 +432,7 @@ FRESULT rppicomidi::Settings_file::restore_one_file(const char* fullpath, const 
         error_code = pico_close(localfile);
         if (error_code != LFS_ERR_OK) {
             printf("error %s closing %s\r\n", pico_errmsg(error_code), filename);
-            free((void*)buffer);
+            delete[] buffer;
             pico_unmount();
             return FR_INT_ERR;
         }
@@ -440,7 +440,7 @@ FRESULT rppicomidi::Settings_file::restore_one_file(const char* fullpath, const 
         localfile = pico_open(filename, LFS_O_WRONLY);
         if (localfile < 0) {
             printf("error %s opening %s for writing\r\n", pico_errmsg(localfile), filename);
-            free((void*)buffer);
+            delete[] buffer;
             pico_unmount();
             return FR_INT_ERR;
         }
@@ -449,18 +449,21 @@ FRESULT rppicomidi::Settings_file::restore_one_file(const char* fullpath, const 
     // file is open for writing; write the settings
     error_code = pico_write(localfile, buffer, strlen(buffer)+1);
 
-    free(buffer);
     pico_close(localfile);
     pico_unmount();
     if (error_code < 0) {
         printf("error %s writing settings to file\r\n", pico_errmsg(error_code));
+        delete[] buffer;
         return FR_INT_ERR;
     }
     else if ((size_t)error_code < strlen(buffer)) {
         printf("store: Only %d bytes stored out of %u\r\n", error_code, strlen(buffer));
         // hmm. no idea why that should happen
+        delete[] buffer;
         return FR_INT_ERR;
     }
+    delete[] buffer;
+
     return FR_OK;
 }
 
@@ -697,18 +700,21 @@ int rppicomidi::Settings_file::store()
     // file is open for writing; write the settings
     error_code = pico_write(file, settings_str, strlen(settings_str)+1);
 
-    free(settings_str);
     pico_close(file);
     pico_unmount();
     if (error_code < 0) {
         printf("error %s writing settings to file\r\n", pico_errmsg(error_code));
+        free(settings_str);
         return error_code;
     }
     else if ((size_t)error_code < strlen(settings_str)) {
         printf("store: Only %d bytes stored out of %u\r\n", error_code, strlen(settings_str));
         // hmm. no idea why that should happen
+        free(settings_str);
         return LFS_ERR_IO;
     }
+    free(settings_str);
+
     return LFS_ERR_OK;
 }
 
