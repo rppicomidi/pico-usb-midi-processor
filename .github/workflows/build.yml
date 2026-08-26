@@ -43,7 +43,7 @@ jobs:
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          path: firmware/build/*.uf2
+          path: build/*.uf2
 
   publish:
     name: Publish firmware
