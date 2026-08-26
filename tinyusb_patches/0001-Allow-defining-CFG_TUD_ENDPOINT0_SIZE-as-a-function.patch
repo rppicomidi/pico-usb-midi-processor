@@ -1,36 +1,35 @@
-From e449b250d1ec15a7e34f97749b60e9f74f309c9c Mon Sep 17 00:00:00 2001
+From 094283d92b4a99982f59c4fd35106801750a8440 Mon Sep 17 00:00:00 2001
 From: rppicomidi <rppicomidi@gmail.com>
-Date: Mon, 21 Aug 2023 12:09:03 -0700
+Date: Tue, 25 Aug 2026 20:18:21 -0700
 Subject: [PATCH] Allow defining CFG_TUD_ENDPOINT0_SIZE as a function
 
 ---
- src/device/usbd_control.c |  6 +++++-
+ src/device/usbd_control.c |  4 ++++
  src/tusb_option.h         | 25 +++++++++++++++++++++++--
- 2 files changed, 28 insertions(+), 3 deletions(-)
+ 2 files changed, 27 insertions(+), 2 deletions(-)
 
 diff --git a/src/device/usbd_control.c b/src/device/usbd_control.c
-index 76d062e40..ae5f48c22 100644
+index c9700fd9d..eace0aa96 100644
 --- a/src/device/usbd_control.c
 +++ b/src/device/usbd_control.c
-@@ -56,7 +56,11 @@ typedef struct
- tu_static usbd_control_xfer_t _ctrl_xfer;
+@@ -60,7 +60,11 @@ typedef struct {
+ static usbd_control_xfer_t _ctrl_xfer;
  
- CFG_TUD_MEM_SECTION CFG_TUSB_MEM_ALIGN
--tu_static uint8_t _usbd_ctrl_buf[CFG_TUD_ENDPOINT0_SIZE];
+ CFG_TUD_MEM_SECTION static struct {
 +#if CFG_TUD_EP0_SZ_IS_FN
-+  tu_static uint8_t _usbd_ctrl_buf[CFG_TUD_ENDPOINT0_MAX];
++  TUD_EPBUF_DEF(buf, CFG_TUD_ENDPOINT0_MAX);
 +#else
-+  tu_static uint8_t _usbd_ctrl_buf[CFG_TUD_ENDPOINT0_SIZE];
+   TUD_EPBUF_DEF(buf, CFG_TUD_ENDPOINT0_SIZE);
 +#endif
+ } _ctrl_epbuf;
  
  //--------------------------------------------------------------------+
- // Application API
 diff --git a/src/tusb_option.h b/src/tusb_option.h
-index c72117850..6e9b9e896 100644
+index 86cb6d046..1231f6869 100644
 --- a/src/tusb_option.h
 +++ b/src/tusb_option.h
-@@ -333,7 +333,24 @@
-   #define CFG_TUD_MEM_ALIGN       CFG_TUSB_MEM_ALIGN
+@@ -453,7 +453,24 @@
+   #define CFG_TUD_MEM_DCACHE_LINE_SIZE CFG_TUSB_MEM_DCACHE_LINE_SIZE
  #endif
  
 +// You can define CFG_TUD_ENDPOINT0_SIZE to be a function that returns uint8_t
@@ -54,7 +53,7 @@ index c72117850..6e9b9e896 100644
    #define CFG_TUD_ENDPOINT0_SIZE  64
  #endif
  
-@@ -484,8 +501,12 @@
+@@ -656,8 +673,12 @@
  //------------------------------------------------------------------
  // Configuration Validation
  //------------------------------------------------------------------
@@ -70,5 +69,5 @@ index c72117850..6e9b9e896 100644
  
  // To avoid GCC compiler warnings when -pedantic option is used (strict ISO C)
 -- 
-2.34.1
+2.43.0
 

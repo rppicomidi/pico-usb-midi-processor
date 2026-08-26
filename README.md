@@ -149,20 +149,83 @@ Button board COM->Feather board GND
 UART adapter Rx and Tx to Feather Board Tx and Rx
 
 # Software Build Instructions
+## The easy way
+If you do not plan to do your own development to
+add you own custom MIDI processors, the easiest
+thing to do is to download a pre-built .uf2 file
+and program your hardware directly. I plan to
+release .uf2 images some time this year. If I have
+not gotten to do that yet or you will be hacking,
+please read on.
+
 ## Set up your environment
 
 The PUMP project uses original code plus a lot of code from other
 projects on GitHub. Most are git submodules. All code is written
 in C, C++, or the RP2040's PIO state machine assembly code. To
-build it, you need to install the Pico C SDK version 1.5.1 or later.
-The environment is a bit simpler to set up using Pico SDK version 2.0.
-Before you attempt to build this project, please set up and build the
-[pico-usb-midi-filter](https://github.com/rppicomidi/pico-usb-midi-filter?tab=readme-ov-file#software) as described in the linked Software section
-of the `README.md` file. That section describes how to set up the
-SDK, and patch the TinyUSB library.
+build it, you should use Pico C SDK version 2.3. You must use
+version 0.18.0 of TinyUSB. This is the version that ships with
+Pico SDK version 2.3.
 
-## Install and build the project source code
-### Preview
+### Install the project source code
+The following instructions assume you install source code
+for your projects in some directory that I will call `${PICO_PROJECTS}`.
+
+```
+cd ${PICO_PROJECTS}
+git clone https://github.com/rppicomidi/pico-usb-midi-processor.git
+cd pico-usb-midi-processor
+git submodule update --recursive --init
+```
+
+### Patch the TinyUSB Source
+Before you attempt to build this project, you will need to patch
+TinyUSB. The patch allows certain USB Device descriptor properties
+to be specified as a function instead of as a constant. Unless
+you activate this patch delibrately, the patch should do nothing.
+
+You need to know where the Pico-SDK source code is installed on your
+system. If you use the Official Raspberry Pi
+Pico VS Code Extension, the extension installs the toolchain in a hidden
+directory. For example, on a Mac, the Pico-SDK 2.3 source is located in
+`${HOME}/.pico-sdk/sdk/2.3.0/`. If you use a command line system
+as described in appendix C of the [Getting Started](https://pip-assets.raspberrypi.com/categories/610-raspberry-pi-pico/documents/RP-008276-DS-2-getting-started-with-pico.pdf)
+guide, then you have more control where you install the Pico-SDK source.
+For the purposes of these instructions, I define the Pico-SDK install
+location as `${PICO_SDK_PATH}`.
+
+I recommend applying the patch in a separate git branch in the Pico-SDK's TinyUSB submodule.
+```
+cd ${PICO_SDK_PATH}/lib/tinyusb
+git checkout -b ep0sz-fn
+git apply ${PICO_PROJECTS}/pico-usb-midi-processor/tinyusb_patches/0001-Allow-defining-CFG_TUD_ENDPOINT0_SIZE-as-a-function.patch
+git add src/
+git commit -m 'Allow defining CFG_TUD_ENDPOINT0_SIZE as a function'
+```
+If your version of TinyUSB is older than 0.18.0, this patch probably will not apply. Keeping this version in a branch
+will let you go back to it if you mess around with TinyUSB source for some other reason.
+
+### Install the Pico-PIO-USB dependency
+TinyUSB uses the Pico-PIO-USB library to implement the host port for this project.
+TinyUSB has a built-in tool python3 tool to install the right version of this.
+```
+cd ${PICO_SDK_PATH}/lib/tinyusb
+python3 tools/get-deps.py rp2040
+```
+
+If you do not have python3 installed or would rather not pull in libraries other than
+what you absolutely need, you can do it this way; it lets you try other versions
+of this library if you choose to.
+```
+cd ${PICO_SDK_PATH}/lib/tinyusb
+cd hw/mcu/
+mkdir raspberry_pi
+cd raspberry_pi
+git clone https://github.com/sekigon-gonnoc/Pico-PIO-USB.git
+cd Pico-PIO-USB
+git checkout fe9133fc513b82cc3dc62c67cb51f2339cf29ef7
+```
+### More about the project source code
 This project uses the main application files plus some libraries
 from various GitHub projects.
 - the Pico-PIO-USB project and a patched version of TinyUSB
@@ -192,9 +255,10 @@ setting template classes that know how to serialize to JSON and deserialize
 from JSON. It's not quite full MVC pattern, but it's not bad.
 
 When you are installing the software, your directory structure
-on your computer should look like this:
+on your computer should look like this if you installed the Pico-SDK
+yourself for command line builds.
 ```
-$PICO_DIR
+${PICO_PROJECTS}
     |
     +--pico-sdk
     |   |
@@ -244,28 +308,7 @@ $PICO_DIR
             +--ssd1306 (a font library)
 ```
 
-
-### Installing and building the Project Source Code
-
-These instructions assume you have already been able to build the
-`pico-usb-midi-filter` project to test the toolchain and the
-patched version of TinyUSB.
-
-To install on a Linux build host, use the following command line
-commands. `${PICO_DIR}` refers to the some top level directory where
-you are are storing your Raspberry Pi Pico source code.
-
-```
-cd ${PICO_DIR}
-
-# get the project source code and the library submodules
-git clone https://github.com/rppicomidi/pico-usb-midi-processor.git
-git submodule update --recursive --init
-```
-To do a command line build, follow the same workflow as the
-`pico-usb-midi-filter` project. Make sure to set the `PICO_BOARD`
-CMake variable in the CMake command line to match your hardware.
-
+## Building the Project Source Code
 Building using VS Code should be straightforward because I put a
 `.vscode` directory in with the project. If you are using the
 Raspberry Pi Pico extension for VS Code, click on the Pico icon
