@@ -37,6 +37,8 @@ target_sources(midi_processor PRIVATE
  midi_processor_chan_mes_remap_settings_view.cpp
  midi_processor_raw_remap.cpp
  midi_processor_raw_remap_view.cpp
+ midi_processor_chan_mes_range_offset.cpp
+ midi_processor_chan_mes_range_offset_settings_view.cpp
  preset_view.cpp
  clock_set_view.cpp
  backup_view.cpp
