@@ -30,14 +30,12 @@
 namespace rppicomidi
 {
 /**
- * @brief This class remaps the byte following the status byte to a new value.
- * If the new value is 128, then the message is filtered out.
- * 
- * This processor is most useful for mapping CC number or Note numbers
- * to new values for button presses. If the button has an LED with illumnination
- * controlled by a return message of the same type and CC number or Note number,
- * use Midi_processor_chan_button_remap class instead; it has a feedback method
- * implemented.
+ * @brief This class implements a generalized mapper that remaps any
+ * channel message other than pitch bend to any other. It can also
+ * re-channelize messages over ranges of values, and it can add or
+ * subtract a fixed offset from data bytes. It is useful for
+ * creating keyboard splits, mapping CC messages to channel
+ * pressure messages, and other specialized applications.
  */
 class Midi_processor_chan_mes_range_offset : public Midi_processor
 {

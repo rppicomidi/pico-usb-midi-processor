@@ -46,20 +46,20 @@ bool rppicomidi::Midi_processor_chan_mes_range_offset::process(uint8_t* packet)
 {
     uint8_t msg_chan = Midi_processor::get_channel_num(packet);
     if (msg_chan == chan_in.get()) {
-        printf("got channel match\r\n");
+        //printf("got channel match\r\n");
         // got a channel message on the right channel. See if it is the right type to process
         uint8_t status = (packet[1] >> 4) & 0xf;
         uint8_t in_msg_status = message_type_in.get_ivalue() + 0x8;
         uint8_t out_msg_status = message_type_out.get_ivalue() + 0x8;
-        printf("status=%02x in_msg_status=%02x\r\n",status, in_msg_status);
+        //printf("status=%02x in_msg_status=%02x\r\n",status, in_msg_status);
         if (status == in_msg_status)
         {
-            printf("got status match\r\n");
+            //printf("got status match\r\n");
             // found the right channel message type. Are the bytes in range?
             if (packet[2] >= byte1_range.get(0,0) && packet[2] <= byte1_range.get(0,1) &&
                 ((packet[3] >= byte2_range.get(0,0) && packet[3] <= byte2_range.get(0,1)) || 
                     status == MIDI_CIN_CHANNEL_PRESSURE  || status == MIDI_CIN_PROGRAM_CHANGE)) {
-                        printf("got byte range match\r\n");
+                //printf("got byte range match\r\n");
                 mutex_enter_blocking(&processing_mutex);
                 // Fix up the cin in byte 0 and remap the channel message status
                 packet[0] &= 0xf0;
