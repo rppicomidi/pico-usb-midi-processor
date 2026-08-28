@@ -50,8 +50,10 @@ public:
     const std::vector<std::string>* get_all_possible_channel_message_types() const { return message_type_in.get_all_possible_values(); }
     bool set_message_in_type(size_t idx) { dirty = message_type_in.get_ivalue() != (int)idx; return message_type_in.set(idx); }
     void get_message_in_type(std::string &typestr) { message_type_in.get(typestr); }
+    int get_message_in_idx() {return message_type_in.get_ivalue(); }
     bool set_message_out_type(size_t idx) { dirty = message_type_out.get_ivalue() != (int)idx; return message_type_out.set(idx); }
     void get_message_out_type(std::string &typestr) { message_type_out.get(typestr); }
+    int get_message_out_idx() {return message_type_out.get_ivalue(); }
     bool set_display_format(size_t idx) { dirty = true; return display_format.set(idx); }
     void get_display_format(std::string &typestr) { display_format.get(typestr); }
     size_t get_display_format() {return display_format.get_ivalue(); }

@@ -77,10 +77,12 @@ void rppicomidi::Midi_processor_chan_mes_range_offset_settings_view::entry()
             Midi_processor_chan_mes_range_offset::static_chan_out_incr, reinterpret_cast<void*>(proc));
     assert(chan_out_menu_item);
     menu.add_menu_item(chan_out_menu_item);
+    mes_in_type_menu.set_current_item_idx(remap_proc->get_message_in_idx());
     const char* text_in_msg_type =( std::string(" In:") + ((*mes_type_list)[mes_in_type_menu.get_current_item_idx()])).c_str();
     mes_in_type_menu_item = new View_launch_menu_item(mes_in_type_menu, text_in_msg_type, screen, font);
     assert(mes_in_type_menu_item);
     menu.add_menu_item(mes_in_type_menu_item);
+    mes_out_type_menu.set_current_item_idx(remap_proc->get_message_out_idx());
     const char* text_out_msg_type =( std::string("Out:") + ((*mes_type_list)[mes_out_type_menu.get_current_item_idx()])).c_str();
     mes_out_type_menu_item = new View_launch_menu_item(mes_out_type_menu, text_out_msg_type, screen, font);
     assert(mes_out_type_menu_item);
