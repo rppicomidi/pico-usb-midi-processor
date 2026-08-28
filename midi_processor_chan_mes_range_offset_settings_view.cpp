@@ -91,7 +91,7 @@ void rppicomidi::Midi_processor_chan_mes_range_offset_settings_view::entry()
 
     auto range1_item = new Bimap_spinner_menu_item<uint8_t>("Byte1 In:", screen, font, 0, 3, 2, fmt_idx == 1,
         Midi_processor_chan_mes_range_offset::static_get_byte1_range, Midi_processor_chan_mes_range_offset::static_incr_byte1_range,
-        reinterpret_cast<void*>(remap_proc));
+        reinterpret_cast<void*>(remap_proc), true);
     menu.add_menu_item(range1_item);
     auto offset1_item = new Int_spinner_menu_item<int8_t>("Byte1 Out Offset:",screen, font, 3, 3, false,
             Midi_processor_chan_mes_range_offset::static_get_byte1_offset,
@@ -99,7 +99,7 @@ void rppicomidi::Midi_processor_chan_mes_range_offset_settings_view::entry()
     menu.add_menu_item(offset1_item);
     auto range2_item = new Bimap_spinner_menu_item<uint8_t>("Byte2 In:", screen, font, 0, 3, 2, fmt_idx == 1,
         Midi_processor_chan_mes_range_offset::static_get_byte2_range, Midi_processor_chan_mes_range_offset::static_incr_byte2_range,
-        reinterpret_cast<void*>(remap_proc));
+        reinterpret_cast<void*>(remap_proc), true);
     menu.add_menu_item(range2_item);
     auto offset2_item = new Int_spinner_menu_item<int8_t>("Byte2 Out Offset:",screen, font, 3, 3, false,
             Midi_processor_chan_mes_range_offset::static_get_byte2_offset,
