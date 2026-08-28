@@ -54,7 +54,7 @@ bool rppicomidi::Midi_processor_chan_mes_remap::process_internal(uint8_t* packet
     if (msg_chan == chan.get()) {      
         // got a channel message on the right channel. See if it is the right type to process
         uint8_t status = (packet[1] >> 4) & 0xf;
-        if (((status == MIDI_CIN_NOTE_ON || status == MIDI_CIN_NOTE_ON) && message_type == note_msg) ||
+        if (((status == MIDI_CIN_NOTE_ON || status == MIDI_CIN_NOTE_OFF) && message_type == note_msg) ||
             (status == MIDI_CIN_CONTROL_CHANGE && message_type == cc_msg) ||
             (status == MIDI_CIN_POLY_KEYPRESS && message_type == poly_pressure_msg) ||
             (status == MIDI_CIN_CHANNEL_PRESSURE && message_type == chan_pressure_msg) ||
