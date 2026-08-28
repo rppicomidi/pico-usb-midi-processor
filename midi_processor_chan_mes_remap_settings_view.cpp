@@ -57,6 +57,7 @@ void rppicomidi::Midi_processor_chan_mes_remap_settings_view::entry()
     auto remap_proc = reinterpret_cast<Midi_processor_chan_mes_remap*>(proc);
     auto mes_type_list = remap_proc->get_all_possible_channel_message_types();
     menu.clear();
+    mes_type_menu.set_current_item_idx(remap_proc->get_message_type_idx());
     const char* text = (*mes_type_list)[mes_type_menu.get_current_item_idx()].c_str();
     mes_type_menu_item = new View_launch_menu_item(mes_type_menu, text, screen, font);
     assert(mes_type_menu_item);
