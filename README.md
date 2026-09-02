@@ -40,8 +40,12 @@ The PUMP USB A port can also accept a USB Flash Drive to allow you to back up an
 only. Future versions of this code will allow you to export and import
 presets one preset at a time to any one device.
 
-# Disclaimers
+If you want a simpler project with no UI that just does a set of
+fixed MIDI processing, please consider modifying the [pico-usb-midi-filter](https://github.com/rppicomidi/pico-usb-midi-filter) project instead.
+You will have to hand-code the processing you need, but you will save
+hardware complexity and cost.
 
+# Disclaimers
 This project requires correctly soldering a USB host port connector
 to a Raspberry Pi Pico board. The circuit described here has no current
 limiting, ESD protection, or other safeguards. Measure voltages carefully
@@ -113,7 +117,7 @@ handy for debug. Because the USB host uses Pico pins 1 and 2, I use
 Pico pins 21 and 22 for the debug UART. The SWCLK, GND and SWDIO pins
 on the bottom of the board wire to the corresponding pins on the Pico Probe.
 
-## A more costly, but easier build circuit
+## A more costly, but easier to build circuit
 
 If soldering all of those wires seems like too much, you can use the
 [Adafruit RP2040 Feather with USB A Host](https://learn.adafruit.com/adafruit-feather-rp2040-with-usb-type-a-host/overview) board instead
@@ -134,38 +138,42 @@ to wire to the breadboard.
 
 The `CMakeFiles.txt` file is set up to assume you wired it as
 follows:
-OLED VCC->Feather board 3.3V
-OLED BOARD GND->Feather board GND
-OLED SDA->Feather board SDA pin
-OLED SCL->Feather board SCL pin
-SHIFT Button->Feather board D5 pin
-BACK Button->Feather board D6 pin
-ENTER Button->Feather board D9 pin
-RIGHT Button->Feather board D10 pin
-LEFT Button->Feather board D11 pin
-DOWN Button->Feather board D12 pin
-UP Button->Feather board D13 pin
-Button board COM->Feather board GND
-UART adapter Rx and Tx to Feather Board Tx and Rx
+- OLED VCC->Feather board 3.3V
+- OLED BOARD GND->Feather board GND
+- OLED SDA->Feather board SDA pin
+- OLED SCL->Feather board SCL pin
+- SHIFT Button->Feather board D5 pin
+- BACK Button->Feather board D6 pin
+- ENTER Button->Feather board D9 pin
+- RIGHT Button->Feather board D10 pin
+- LEFT Button->Feather board D11 pin
+- DOWN Button->Feather board D12 pin
+- UP Button->Feather board D13 pin
+- Button board COM->Feather board GND
+- UART adapter Rx and Tx to Feather Board Tx and Rx
 
 # Software Build Instructions
 ## The easy way
 If you do not plan to do your own development to
 add you own custom MIDI processors, the easiest
 thing to do is to download a pre-built .uf2 file
-and program your hardware directly. I plan to
-release .uf2 images some time this year. If I have
-not gotten to do that yet or you will be hacking,
-please read on.
+and program your hardware directly. You will find the latest
+midi_processor.uf2 file for the pico board in the Releases section
+of the project home page. In the future, the build
+will create two .uf2 files: one for the pico board and one
+for the Adafruit Feather board. If you need that urgently,
+please file an issue and I will hopefully get to it sooner
+rather than later.
 
-## Set up your environment
-
+## Building it yourself
+### Build environment overview
 The PUMP project uses original code plus a lot of code from other
 projects on GitHub. Most are git submodules. All code is written
 in C, C++, or the RP2040's PIO state machine assembly code. To
 build it, you should use Pico C SDK version 2.3. You must use
 version 0.18.0 of TinyUSB. This is the version that ships with
-Pico SDK version 2.3.
+Pico SDK version 2.3. The TinyUSB version is important because
+this project requires you to apply a patch to TinyUSB.
 
 ### Install the project source code
 The following instructions assume you install source code
@@ -180,9 +188,10 @@ git submodule update --recursive --init
 
 ### Patch the TinyUSB Source
 Before you attempt to build this project, you will need to patch
-TinyUSB. The patch allows certain USB Device descriptor properties
-to be specified as a function instead of as a constant. Unless
-you activate this patch delibrately, the patch should do nothing.
+TinyUSB. The patch allows a USB Device descriptor property
+to be specified as a function instead of as a constant. The patch
+does will not change the way other projects work with TinyUSB
+unless you specifically activate the patch during build.
 
 You need to know where the Pico-SDK source code is installed on your
 system. If you use the Official Raspberry Pi
@@ -202,8 +211,13 @@ git apply ${PICO_PROJECTS}/pico-usb-midi-processor/tinyusb_patches/0001-Allow-de
 git add src/
 git commit -m 'Allow defining CFG_TUD_ENDPOINT0_SIZE as a function'
 ```
-If your version of TinyUSB is older than 0.18.0, this patch probably will not apply. Keeping this version in a branch
-will let you go back to it if you mess around with TinyUSB source for some other reason.
+If your version of TinyUSB is older than 0.18.0, this patch will not apply. Keeping this version in a branch
+will let you go back to it if you mess around with TinyUSB source for some other reason. To go back to the version of TinyUSB that shipped with
+the 2.3.0 version of the pico-sdk
+```
+cd $(PICO_SDK_PATH}/lib/tinyusb
+git checkout 0.18.0
+```
 
 ### Install the Pico-PIO-USB dependency
 TinyUSB uses the Pico-PIO-USB library to implement the host port for this project.
@@ -256,7 +270,7 @@ from JSON. It's not quite full MVC pattern, but it's not bad.
 
 When you are installing the software, your directory structure
 on your computer should look like this if you installed the Pico-SDK
-yourself for command line builds.
+for command line builds under the `$PICO_PROJECTS}` directory.
 ```
 ${PICO_PROJECTS}
     |
@@ -309,14 +323,26 @@ ${PICO_PROJECTS}
 ```
 
 ## Building the Project Source Code
+### Using the Command Line
+Make sure you can build simpler applications from the command line before you attempt this.
+```
+cd ${PICO_PROJECTS}\pico-usb-midi-processor
+mkdir build
+cd build
+cmake .. -DPICO_BOARD=[insert your target board here; either pico or adafruit_feather_rp2040_usb_host]
+make
+```
+### Using VS Code
 Building using VS Code should be straightforward because I put a
 `.vscode` directory in with the project. If you are using the
 Raspberry Pi Pico extension for VS Code, click on the Pico icon
 in the left window and import the project. It should import cleanly.
-Don't forget to set the `PICO_BOARD` variable in the CMake Configuration settings.
+Be sure to choose the correct board type before you start the build.
 
+### Supported target boards
 Whether building on the command line or using VS Code, please note that
 the supported values of `PICO_BOARD` are `pico` and `adafruit_feather_rp2040_usb_host`.
+This code may work on other boards, but it is neither supported nor tested.
 
 # Operating Instructions
 
@@ -356,7 +382,12 @@ If it is a parameter you choose from a list, then pressing Enter will
 change to a screen with the list of items to choose; navigate to the item
 you want and press Enter to select it.
 
-Once you start editing presets, the home screen will show
+### Presets
+The PUMP is always usings settings from the current preset.
+The current preset is a number from 1-8.
+Whenever you add a processor or edit its parameters, you are
+editing the current preset.
+Once you start editing, the home screen will show
 `Preset:1[M]` or similar. The `[M]` means that the current
 preset has been modified. If you want to save it, highlight
 the `Preset:1[M]` line on the home screen and press Enter.
@@ -396,7 +427,7 @@ displays the product's name on the first two lines of the screen.
 For example
 
 ![](doc/PUMP-delete-one.bmp)
-
+### Preset Backup
 PUMP supports backing up and restoring preset files to
 any USB flash drive up to 32 GB. Just unplug your MIDI device
 and plug in a USB flash drive. You will see a screen for setting
@@ -457,6 +488,11 @@ only for that device.
 For your convenience, the `Save/Restore Presets to Flash Drive` menu
 also provides a way to access the `Presets memory...` option.
 
+Because the Pico-PIO-USB host port is very slow, you should
+use a completely empty or almost completely empty flash drive to
+backup and restore presets. If you use a flash drive with a lot
+of files on it, the PUMP may appear to lock up while it parses
+through all of the FAT file system info.
 ## Processing paths
 
 Data from the attached device goes to the what the PUMP calls "MIDI IN" ports.
@@ -475,8 +511,8 @@ Some processors have "feedback" processing. For example, if you
 remap a control surface button that has an LED, usually the DAW
 will use the same message to control the LED that the control
 surface sends to the DAW to indicate button press. For this example,
-if pressing the control surface button sends NOTE ON 50 to the DAW, then the
-DAW will send back NOTE ON 50 to light the button's LED. If
+if pressing the control surface button sends `Channel 1 NOTE ON 50 127` to the DAW, then the
+DAW will send back `Channel 1 NOTE ON 50 127` to light the button's LED. If
 you assign a PUMP processor to remap control surface button's MIDI note
 number to something else, then that processor needs a feedback
 process to map the message from the DAW back to the message the
@@ -487,7 +523,8 @@ MIDI OUT x port. This "feedback" process does not show on the MIDI OUT
 Setup on the OLED screen, but it is there.
 
 ## List of MIDI Processors
-- Channel Button Remap: convert the 2nd byte of a 3-byte
+### Channel Button Remap
+Convert the 2nd byte of a 3-byte
 MIDI channel message to a different value; in the opposite
 data direction, convert the second value back to the original
 value. This is useful for remapping buttons that have LEDs
@@ -506,9 +543,11 @@ feedback path will convert `yy` to `vv`. If you want to filter out
 a particular `vv` so the message is not passed on at all,
 increment the `yy` value until it shows `**`. The same
 works in reverse for the feedback path.
-- Channel Message Remap: same as Channel Button Remap without
+### Channel Message Remap
+Same as Channel Button Remap without
 the feedback path.
-- MC Fader Pickup: Mackie Control compatible control surfaces
+### MC Fader Pickup
+Mackie Control compatible control surfaces
 send fader movements embedded in Channel Pitch Bend messages.
 If you move a fader and the host DAW is not synchronized to
 it, then the DAW fader position will jump. To prevent jumps,
@@ -517,7 +556,8 @@ to the PUMP, the PUMP will record that position and will
 not forward a fader movement from the attached MIDI device
 until the fader position moves past the last position the
 DAW sent.
-- Transpose: if a channel note message passes into the
+### Transpose
+If a channel note message passes into the
 processor with the correct MIDI channel and within the
 Min MIDI note and Max MIDI note note number range, then
 the processor will add Halfstep delta halfsteps to the
@@ -525,7 +565,42 @@ note number. If the Halfstep delta value is negative,
 then the processor will subtract halfsteps from the
 note number. You can view the min and max note numbers
 in Decimal or Hex format in the settings screen.
-- More processors are possible. If you made one yourself,
+### Raw Message Remap
+If an incoming 3-byte channel message matches
+exactly the specified raw in message byte for byte, then replace
+that message with the raw out message. Otherwise, pass the
+input message on to the next processor unchanged. Use this
+message to directly translate one message to another.
+### Chan Mes Range Offset
+If the input message mataches the
+specified channel and message type, and if the first byte
+is within the byte1 range, and if the
+the second byte is within the byte2 range, substitute
+a new message with the new channel, message type, and
+the 1st data and 2nd data bytes in the message
+changed by the specified byte1 and byte2 offset. Otherwise, pass the
+message through unchanged. 
+
+If the message type for for both the input message and the output message
+only require 2 bytes, then the byte2 offset and byte2 range are
+unused.
+
+If the input message type
+has 3 bytes and the output only 2 (e.g., mapping a CC message
+to a channel pressure message), assign the 2nd data byte
+of the input message changed by the 2nd byte offset to the only
+data byte of the output message.
+
+If the input message
+type has only one data byte and the output message has 2
+(e.g., mapping a channel pressure message to a CC message),
+then the first data byte of the input message is the output
+offset of byte 2, and second data byte of the output message
+is the input message data byte changed by the output message
+byte 1 offset.
+### More processors are possible
+If you made one yourself,
 please file a pull request and I will consider adding it.
 If you have a specific request, please file an issue and
-I will try to get to it if I have time.
+I will try to get to it if I have time and if I think
+the processor is of general utility.
