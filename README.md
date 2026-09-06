@@ -158,12 +158,10 @@ If you do not plan to do your own development to
 add you own custom MIDI processors, the easiest
 thing to do is to download a pre-built .uf2 file
 and program your hardware directly. You will find the latest
-midi_processor.uf2 file for the pico board in the Releases section
-of the project home page. In the future, the build
-will create two .uf2 files: one for the pico board and one
-for the Adafruit Feather board. If you need that urgently,
-please file an issue and I will hopefully get to it sooner
-rather than later.
+`pico_usb_midi_processor.uf2` (for the Pico board) and 
+`adafruit_usb_midi_processor.uf2` (for the Adafruit Feather RP2040
+with USB A Host board) file
+for the pico board in the Releases section of the project home page.
 
 ## Building it yourself
 ### Build environment overview
@@ -322,8 +320,14 @@ ${PICO_PROJECTS}
             +--ssd1306 (a font library)
 ```
 
-## Building the Project Source Code
-### Using the Command Line
+### Building the Project Source Code
+#### Supported target boards
+Whether building on the command line or using VS Code, please note that
+the supported values of `PICO_BOARD` are `pico` and `adafruit_feather_rp2040_usb_host`.
+This code may work on other boards, but it is neither supported nor tested.
+You can set the target board for the build in the envirnoment variable `PICO_BOARD` or in the
+cmake command line. If you do not specify a target board, the default is `pico`.
+#### Using the Command Line
 Make sure you can build simpler applications from the command line before you attempt this.
 ```
 cd ${PICO_PROJECTS}\pico-usb-midi-processor
@@ -332,17 +336,22 @@ cd build
 cmake .. -DPICO_BOARD=[insert your target board here; either pico or adafruit_feather_rp2040_usb_host]
 make
 ```
-### Using VS Code
+Alternatively,
+```
+cd ${PICO_PROJECTS}\pico-usb-midi-processor
+mkdir build
+cd build
+export PICO_BOARD=[insert your target board here; either pico or adafruit_feather_rp2040_usb_host]
+cmake ..
+make
+```
+
+#### Using VS Code
 Building using VS Code should be straightforward because I put a
 `.vscode` directory in with the project. If you are using the
 Raspberry Pi Pico extension for VS Code, click on the Pico icon
 in the left window and import the project. It should import cleanly.
 Be sure to choose the correct board type before you start the build.
-
-### Supported target boards
-Whether building on the command line or using VS Code, please note that
-the supported values of `PICO_BOARD` are `pico` and `adafruit_feather_rp2040_usb_host`.
-This code may work on other boards, but it is neither supported nor tested.
 
 # Operating Instructions
 

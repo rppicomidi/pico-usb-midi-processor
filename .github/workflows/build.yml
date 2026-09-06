@@ -40,6 +40,10 @@ jobs:
           cd build
           cmake -DPICO_BOARD=pico ..
           make
+          mv midi_processor.uf2 pico_usb_midi_processor.uf2
+          cmake --fresh -DPICO_BOARD=adafruit_feather_rp2040_usb_host ..
+          make
+          mv midi_processor.uf2 adafruit_usb_midi_processor.uf2
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
