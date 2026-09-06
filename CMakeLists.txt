@@ -1,11 +1,15 @@
 cmake_minimum_required(VERSION 3.13)
+if (NOT DEFINED PICO_BOARD)
+if (DEFINED ENV{PICO_BOARD})
+  set (PICO_BOARD $ENV{PICO_BOARD})
+else()
+  set (PICO_BOARD pico)
+endif()
+endif()
 include (pico_sdk_import.cmake)
 project(pico_usb_midi_processor)
 #override the TinyUSB debug level set in family.cmake
 #set(LOG 3)
-if (NOT DEFINED PICO_BOARD)
-set (PICO_BOARD pico)
-endif()
 pico_sdk_init()
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
