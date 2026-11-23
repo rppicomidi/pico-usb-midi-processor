@@ -22,18 +22,20 @@
  */
 #include "midi_processor_transpose.h"
 #include "parson.h"
+#include "class/midi/midi.h"
 
-bool rppicomidi::Midi_processor_transpose::process(uint8_t* packet)
+bool rppicomidi::Midi_processor_transpose::process_one(Midi_packet& pkt)
  {
     bool success = true; // Only block passing the message on if transposing makes the note out of MIDI range
-    if (get_channel_num(packet) == chan.get()) {
-        uint8_t status = packet[1] & 0xf0;
-        if (status == 0x90 || status == 0x80) {
+    if (pkt.getChanMesChannel() == chan.get()) {
+        uint8_t status = pkt.getChanMesCin();
+        if (status == MIDI_CIN_NOTE_OFF || status == MIDI_CIN_NOTE_ON) {
             // note message
-            if (packet[2] >= min_note.get() && packet[2] <= max_note.get()) {
-                int new_note = packet[2] + transpose_delta.get();
+            auto note = pkt.getData1();
+            if (note >= min_note.get() && note <= max_note.get()) {
+                int new_note = note + transpose_delta.get();
                 if (new_note >= min_note.get() && new_note <= max_note.get()) {
-                    packet[2] = static_cast<uint8_t>(new_note);
+                    pkt.setData1(static_cast<uint8_t>(new_note));
                 }
                 else {
                     success = false;

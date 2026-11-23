@@ -40,12 +40,12 @@ namespace rppicomidi
 class Midi_processor_chan_mes_range_offset : public Midi_processor
 {
 public:
-    Midi_processor_chan_mes_range_offset(const char* name_, uint16_t unique_id);
-    Midi_processor_chan_mes_range_offset(uint16_t unique_id) : Midi_processor_chan_mes_range_offset(static_getname(), unique_id) {}
+    Midi_processor_chan_mes_range_offset(uint16_t unique_id, Midi_buffer* proc_buf_,
+        Thread_safe_midi_buffer* in_buf_, Midi_buffer* fb_buf_, Thread_safe_midi_buffer* out_buf_);
     Midi_processor_chan_mes_range_offset() = delete;
     virtual ~Midi_processor_chan_mes_range_offset()=default;
 
-    bool process(uint8_t *packet) final;
+    bool process_one(Midi_packet& pkt) final;
     virtual bool has_feedback_process() {return false; }
     const std::vector<std::string>* get_all_possible_channel_message_types() const { return message_type_in.get_all_possible_values(); }
     bool set_message_in_type(size_t idx) { dirty = message_type_in.get_ivalue() != (int)idx; return message_type_in.set(idx); }
@@ -162,7 +162,8 @@ public:
     }
 
     static const char *static_getname() { return "Chan Mes Range Offset"; }
-    static Midi_processor* static_make_new(uint16_t unique_id_) { return new Midi_processor_chan_mes_range_offset(unique_id_); }
+    static Midi_processor* static_make_new(uint16_t unique_id_, Midi_buffer* proc_buf_, Thread_safe_midi_buffer* in_buf_, Midi_buffer* fb_buf_, Thread_safe_midi_buffer* out_buf_) {
+        return new Midi_processor_chan_mes_range_offset(unique_id_, proc_buf_, in_buf_, fb_buf_, out_buf_); }
 protected:
     bool process_internal(uint8_t *packet, size_t first_idx, size_t second_idx);
     const std::string note_off_msg;

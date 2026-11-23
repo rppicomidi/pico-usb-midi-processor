@@ -22,15 +22,20 @@
  */
 #include "midi_processor_manager.h"
 #include "midi_processor_mc_fader_pickup.h"
-#include "midi_processor_transpose.h"
-#include "midi_processor_chan_mes_remap.h"
-#include "midi_processor_chan_button_remap.h"
 #include "midi_processor_mc_fader_pickup_settings_view.h"
-#include "midi_processor_transpose_view.h"
+#include "midi_processor_chan_mes_remap.h"
 #include "midi_processor_chan_mes_remap_settings_view.h"
+#include "midi_processor_chan_button_remap.h"
+#include "midi_processor_transpose.h"
+#include "midi_processor_transpose_view.h"
 #include "midi_processor_raw_remap.h"
 #include "midi_processor_raw_remap_view.h"
+#include "midi_processor_chan_mes_range_offset.h"
 #include "midi_processor_chan_mes_range_offset_settings_view.h"
+#include "midi_processor_pitchbend_to_cc.h"
+#include "midi_processor_pitchbend_to_cc_settings_view.h"
+#include "midi_processor_clock_generator.h"
+#include "midi_processor_clock_generator_settings_view.h"
 
 uint16_t rppicomidi::Midi_processor_manager::unique_id = 0;
 rppicomidi::Midi_processor_manager::Midi_processor_manager() : screen{nullptr}, current_preset{"current preset",1,8,1}, dirty{true}
@@ -39,17 +44,20 @@ rppicomidi::Midi_processor_manager::Midi_processor_manager() : screen{nullptr}, 
     mutex_init(&processing_mutex);
     proclist.push_back({Midi_processor_mc_fader_pickup::static_getname(), Midi_processor_mc_fader_pickup::static_make_new,
                         Midi_processor_mc_fader_pickup_settings_view::static_make_new});
-    proclist.push_back({Midi_processor_transpose::static_getname(), Midi_processor_transpose::static_make_new,
-                        Midi_processor_transpose_view::static_make_new});
     proclist.push_back({Midi_processor_chan_mes_remap::static_getname(), Midi_processor_chan_mes_remap::static_make_new,
                         Midi_processor_chan_mes_remap_settings_view::static_make_new});
     proclist.push_back({Midi_processor_chan_button_remap::static_getname(), Midi_processor_chan_button_remap::static_make_new,
                         Midi_processor_chan_mes_remap_settings_view::static_make_new});
+    proclist.push_back({Midi_processor_transpose::static_getname(), Midi_processor_transpose::static_make_new,
+                        Midi_processor_transpose_view::static_make_new});
     proclist.push_back({Midi_processor_raw_remap::static_getname(), Midi_processor_raw_remap::static_make_new,
                         Midi_processor_raw_remap_view::static_make_new});
     proclist.push_back({Midi_processor_chan_mes_range_offset::static_getname(), Midi_processor_chan_mes_range_offset::static_make_new,
                         Midi_processor_chan_mes_range_offset_settings_view::static_make_new});
-
+    proclist.push_back({Midi_processor_pitchbend_to_cc::static_getname(), Midi_processor_pitchbend_to_cc::static_make_new,
+                        Midi_processor_pitchbend_to_cc_settings_view::static_make_new});
+    proclist.push_back({Midi_processor_clock_generator::static_getname(), Midi_processor_clock_generator::static_make_new,
+                        Midi_processor_clock_generator_settings_view::static_make_new});
     *id_str = '\0';
     *prod_str = '\0';
     Settings_file::instance(); // construct the Settings_file instance
@@ -89,14 +97,17 @@ rppicomidi::Midi_processor_settings_view* rppicomidi::Midi_processor_manager::ad
 {
     Midi_processor_settings_view* retview = nullptr;
     assert(screen);
+    rppicomidi::Midi_processor_settings_view* view;
     if (idx < proclist.size()) {
-        auto proc = proclist[idx].processor(unique_id++);
-        auto view = proclist[idx].view(*screen, screen->get_clip_rect(), proc);
         mutex_enter_blocking(&processing_mutex);
         if (is_midi_in) {
+            auto proc = proclist[idx].processor(unique_id++, &proc_buf, in_buf, &fb_buf, out_buf);
+            view = proclist[idx].view(*screen, screen->get_clip_rect(), proc);
             midi_in_processors[cable].push_back({proc, view});
         }
         else {
+            auto proc = proclist[idx].processor(unique_id++, &fb_buf, out_buf, &proc_buf, in_buf);
+            view = proclist[idx].view(*screen, screen->get_clip_rect(), proc);
             midi_out_processors[cable].push_back({proc, view});
         }
         build_processor_structures();
@@ -160,7 +171,8 @@ void rppicomidi::Midi_processor_manager::clear_all_processors()
         }
         midi_out_processors[cable].clear();
     }
-    processors_with_tasks.clear();
+    midi_in_with_tasks.clear();
+    midi_out_with_tasks.clear();
     mutex_exit(&processing_mutex);
 
 }
@@ -174,7 +186,8 @@ void rppicomidi::Midi_processor_manager::build_processor_structures()
     for (size_t cable=0; cable < midi_out_processors.size(); cable++) {
         midi_out_proc_fns[cable].clear();
     }
-    processors_with_tasks.clear();
+    midi_in_with_tasks.clear();
+    midi_out_with_tasks.clear();
 
     // for each MIDI IN cable, add access to the process() method to the
     // MIDI IN processor function list for the cable #. If necessary,
@@ -182,14 +195,21 @@ void rppicomidi::Midi_processor_manager::build_processor_structures()
     // function list for the cable # and add the task() method the
     // background task list.
     for (size_t cable=0; cable < midi_in_processors.size(); cable++) {
+        size_t idx = 0;
         for (auto& midi_in_proc: midi_in_processors[cable]) {
             midi_in_proc_fns[cable].push_back(Midi_processor_fn{midi_in_proc.proc, false});
             if (midi_in_proc.proc->has_feedback_process() && cable < midi_out_proc_fns.size()) {
                 midi_out_proc_fns[cable].push_back(Midi_processor_fn{midi_in_proc.proc, true});
             }
             if (midi_in_proc.proc->has_task()) {
-                processors_with_tasks.push_back(midi_in_proc.proc);
+                Midi_processor_chain_info info;
+                info.chain = cable;
+                info.fn_list = &midi_in_proc_fns;
+                info.idx = idx;
+                midi_in_proc.proc->set_chain_info(&info);
+                midi_in_with_tasks.push_back(midi_in_proc.proc);
             }
+            ++idx;
         }
     }
 
@@ -199,67 +219,88 @@ void rppicomidi::Midi_processor_manager::build_processor_structures()
     // function list for the cable # and add the task() method the
     // background task list.
     for (size_t cable=0; cable < midi_out_processors.size(); cable++) {
+        size_t idx = 0;
         for (auto& midi_out_proc: midi_out_processors[cable]) {
             midi_out_proc_fns[cable].push_back(Midi_processor_fn{midi_out_proc.proc, false});
             if (midi_out_proc.proc->has_feedback_process() && cable < midi_in_proc_fns.size()) {
                 midi_in_proc_fns[cable].push_back(Midi_processor_fn{midi_out_proc.proc, true});
             }
             if (midi_out_proc.proc->has_task()) {
-                processors_with_tasks.push_back(midi_out_proc.proc);
+                Midi_processor_chain_info info;
+                info.chain = cable;
+                info.fn_list = &midi_out_proc_fns;
+                info.idx = idx;
+                midi_out_proc.proc->set_chain_info(&info);
+                midi_out_with_tasks.push_back(midi_out_proc.proc);
             }
             midi_out_proc.proc->set_not_saved();
         }
     }
 }
 
-bool rppicomidi::Midi_processor_manager::filter_midi_in(uint8_t cable, uint8_t* packet)
+rppicomidi::Midi_buffer* rppicomidi::Midi_processor_manager::filter_midi(Thread_safe_midi_buffer* src_buf, Midi_buffer* p_buf, std::vector<std::vector<Midi_processor_fn>>& proc_fn_list)
 {
-    bool donotfilter = true;
-    //uint8_t cable = Midi_processor::get_cable_num(packet);
+    // Fill the proc_buf with the first packet & the consecutive packets on the same cable as the first one in src_buf.
+    // That is, keep filling proc_buf until there are no more packets or the processing chain changes.
+    Midi_packet pkt;
+    src_buf->lock();
+    if (!src_buf->peek(pkt)) {
+        src_buf->unlock();
+        //printf("filter_midi: src_buf empty. proc_buf.size()==%u\r\n", p_buf->getSize());
+        return p_buf;
+    }
+    //printf("0x%08lx\r\n",pkt.getPacket());
+    uint8_t cable = pkt.getCn();
+    //printf("cable=%u\r\n",cable);
     mutex_enter_blocking(&processing_mutex);
-    if (midi_in_proc_fns.size() > cable) {
-        for (auto& process: midi_in_proc_fns[cable]) {
+    while (!src_buf->isEmpty() && !p_buf->isFull() && src_buf->peek(pkt) && pkt.getCn() == cable) {
+        src_buf->pop(pkt);
+        //printf("filter_midi: src_buf.pop(pkt)->0x%08lx\r\n", pkt.getPacket());
+        p_buf->push(pkt);
+        //printf("p_buf=%p npackets=%u\r\n", p_buf, p_buf->getSize());
+    }
+    src_buf->unlock();
+
+    if (proc_fn_list.size() > cable) {
+        // then the cable number is in range
+        for (auto& process: proc_fn_list[cable]) {
             if (process.is_feedback)
-                donotfilter = process.proc->feedback(packet);
+                process.proc->feedback();
             else
-                donotfilter = process.proc->process(packet);
-            if (!donotfilter)
-                break;
+                process.proc->process();
         }
     }
     mutex_exit(&processing_mutex);
-    return donotfilter;
+    return p_buf;
 }
 
-
-bool rppicomidi::Midi_processor_manager::filter_midi_out(uint8_t cable, uint8_t* packet)
-{
-    bool donotfilter = true;
-    //uint8_t cable = Midi_processor::get_cable_num(packet);
-    mutex_enter_blocking(&processing_mutex);
-    if (midi_out_proc_fns.size() > cable) {
-        for (auto& process: midi_out_proc_fns[cable]) {
-            if (process.is_feedback)
-                donotfilter = process.proc->feedback(packet);
-            else
-                donotfilter = process.proc->process(packet);
-            if (!donotfilter)
-                break;
-        }
-    }
-    mutex_exit(&processing_mutex);
-    return donotfilter;
-}
-
-void rppicomidi::Midi_processor_manager::task()
+rppicomidi::Midi_buffer* rppicomidi::Midi_processor_manager::task(std::vector<Midi_processor*>& processors_with_tasks, Midi_buffer* p_buf)
 {
     mutex_enter_blocking(&processing_mutex);
     for (auto& proc: processors_with_tasks) {
         proc->task();
+        if (!p_buf->isEmpty()) {
+            auto info = proc->get_chain_info();
+            auto fn_list = (*(info->fn_list))[info->chain];
+            for (auto it= fn_list.begin() + info->idx+1; it != fn_list.end(); it++) {
+                auto process = *it;
+                process.proc->task();
+            }
+        }
     }
     mutex_exit(&processing_mutex);
+    return p_buf;
  }
 
+ rppicomidi::Midi_buffer* rppicomidi::Midi_processor_manager::run_midi_in_tasks()
+ {
+    return task(midi_in_with_tasks, &proc_buf);
+ }
+
+ rppicomidi::Midi_buffer* rppicomidi::Midi_processor_manager::run_midi_out_tasks()
+ {
+    return task(midi_out_with_tasks, &fb_buf);
+ }
 
 bool rppicomidi::Midi_processor_manager::needs_store()
 {
@@ -505,7 +546,7 @@ bool rppicomidi::Midi_processor_manager::deserialize(char* json_format)
                                     break;
                                 }
                                 else {
-                                    add_new_midi_processor_by_idx(proc_type_idx, midi_out_port, true);
+                                    add_new_midi_processor_by_idx(proc_type_idx, midi_out_port, false);
                                     JSON_Value* setting_values = json_object_get_value_at(proc_objects, proc_idx);
                                     JSON_Object* setting_objects = json_value_get_object(setting_values);
                                     result = midi_out_processors[midi_out_port][proc_idx].proc->deserialize_settings(setting_objects);

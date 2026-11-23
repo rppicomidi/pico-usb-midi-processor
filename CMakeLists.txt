@@ -43,6 +43,14 @@ target_sources(midi_processor PRIVATE
  midi_processor_raw_remap_view.cpp
  midi_processor_chan_mes_range_offset.cpp
  midi_processor_chan_mes_range_offset_settings_view.cpp
+ midi_processor_pitchbend_to_cc.cpp
+ midi_processor_pitchbend_to_cc.h
+ midi_processor_pitchbend_to_cc_settings_view.cpp
+ midi_processor_pitchbend_to_cc_settings_view.h
+ midi_processor_clock_generator.cpp
+ midi_processor_clock_generator.h
+ midi_processor_clock_generator_settings_view.cpp
+ midi_processor_clock_generator_settings_view.h
  preset_view.cpp
  clock_set_view.cpp
  backup_view.cpp
@@ -60,6 +68,7 @@ target_compile_options(midi_processor PRIVATE -Wall -Wextra)
 target_compile_definitions(midi_processor PRIVATE
 PICO_HEAP_SIZE=0x20000
 PICO_USE_MALLOC_MUTEX=1
+RPPICOMIDI_FORCE_USB_MIDI_HOST=1
 )
 if (PICO_BOARD MATCHES pico)
 target_compile_definitions(midi_processor PRIVATE

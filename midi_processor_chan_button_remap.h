@@ -26,15 +26,22 @@ namespace rppicomidi {
 class Midi_processor_chan_button_remap : public Midi_processor_chan_mes_remap
 {
 public:
-    Midi_processor_chan_button_remap(uint16_t unique_id) : Midi_processor_chan_mes_remap(static_getname(), unique_id)
-    {
+    Midi_processor_chan_button_remap(const char* name_, uint16_t unique_id_,
+        Midi_buffer* proc_buf_, Thread_safe_midi_buffer* in_buf_, Midi_buffer* fb_buf_, Thread_safe_midi_buffer* out_buf_) : 
+        Midi_processor_chan_mes_remap(name_, unique_id_, proc_buf_, in_buf_, fb_buf_, out_buf_) {
     }
+    Midi_processor_chan_button_remap(uint16_t unique_id, Midi_buffer* proc_buf_, Thread_safe_midi_buffer* in_buf_, 
+        Midi_buffer* fb_buf_, Thread_safe_midi_buffer* out_buf_) : 
+            Midi_processor_chan_button_remap(static_getname(), unique_id, proc_buf_, in_buf_, fb_buf_, out_buf_) {}
     Midi_processor_chan_button_remap() = delete;
     virtual ~Midi_processor_chan_button_remap()=default;
-    bool feedback(uint8_t *packet) final { return process_internal(packet, 1, 0); }
+    bool feedback_one(Midi_packet& pkt) {
+        return process_internal(pkt, 1, 0);
+    }
     bool has_feedback_process() final {return true; }
     static const char *static_getname() { return "Channel Button Remap"; }
-    static Midi_processor* static_make_new(uint16_t unique_id_) { return new Midi_processor_chan_button_remap(unique_id_); }
-
+    static Midi_processor* static_make_new(uint16_t unique_id_, Midi_buffer* proc_buf_,
+        Thread_safe_midi_buffer* in_buf_, Midi_buffer* fb_buf_, Thread_safe_midi_buffer* out_buf_) { 
+        return new Midi_processor_chan_button_remap(unique_id_, proc_buf_, in_buf_, fb_buf_, out_buf_); }
 };
 }

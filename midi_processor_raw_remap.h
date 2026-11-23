@@ -31,7 +31,9 @@ namespace rppicomidi
 class Midi_processor_raw_remap : public Midi_processor
 {
 public:
-    Midi_processor_raw_remap(uint16_t unique_id) : Midi_processor{static_getname(), unique_id},
+    Midi_processor_raw_remap(uint16_t unique_id, Midi_buffer* proc_buf_, 
+        Thread_safe_midi_buffer* in_buf_, Midi_buffer* fb_buf_, Thread_safe_midi_buffer* out_buf_) : 
+        Midi_processor{static_getname(), unique_id, proc_buf_, in_buf_, fb_buf_, out_buf_},
         in_mes{" IN:", {0x80,0x0,0x0}, {0xBF, 0x7f, 0x7f}},
         out_mes{"OUT:", {0x80,0x0,0x0}, {0xBF, 0x7f, 0x7f}},
         format_decimal{"Display Decimal"}, format_hex{"Display Hex"},
@@ -41,7 +43,7 @@ public:
         load_defaults();
     }
     virtual ~Midi_processor_raw_remap()=default;
-    bool process(uint8_t* packet) final;
+    bool process_one(Midi_packet& pkt) final;
     static uint8_t get_in_mes_byte(void* context, size_t idx) {
         auto me = reinterpret_cast<Midi_processor_raw_remap*>(context);
         return me->in_mes.get(idx);
@@ -85,7 +87,9 @@ public:
 
     // The following are manditory static methods to enable the Midi_processor_manager class
     static const char* static_getname() { return "Raw Message Remap"; }
-    static Midi_processor* static_make_new(uint16_t unique_id_) {return new Midi_processor_raw_remap(unique_id_); }
+    static Midi_processor* static_make_new(uint16_t unique_id_, Midi_buffer* proc_buf_, Thread_safe_midi_buffer* in_buf_, Midi_buffer* fb_buf_, Thread_safe_midi_buffer* out_buf_) {
+        return new Midi_processor_raw_remap(unique_id_, proc_buf_, in_buf_, fb_buf_, out_buf_);
+    }
 protected:
     Setting_byte3 in_mes;               //!< raw input message bytes
     Setting_byte3 out_mes;              //!< raw output message bytes

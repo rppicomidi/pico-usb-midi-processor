@@ -133,8 +133,8 @@ bool rppicomidi::Mc_fader_pickup::set_hw_fader_value(uint16_t hw_fader_value)
     fader = hw_fader_value;
     return is_synchronized();
 }
-
-bool rppicomidi::Midi_processor_mc_fader_pickup::process(uint8_t* packet)
+#if 0
+bool rppicomidi::Midi_processor_mc_fader_pickup::process_internal(uint8_t* packet)
 {
     bool do_not_filter_out = true; // only filter out pitch bend messages if required
     if (packet[1]>= 0xE0 && packet[1] <= 0xE8) {
@@ -144,11 +144,40 @@ bool rppicomidi::Midi_processor_mc_fader_pickup::process(uint8_t* packet)
     }
     return do_not_filter_out;
 }
-
-bool rppicomidi::Midi_processor_mc_fader_pickup::feedback(uint8_t* packet)
+#endif
+bool rppicomidi::Midi_processor_mc_fader_pickup::process_one(Midi_packet& pkt)
 {
-     // passing the message along after processing does no harm;
-     // if you are using this, your device probably ignores this packet
+    //return process_internal(pkt.getPacketBuffer());
+    bool do_not_filter_out = true; // only filter out pitch bend messages if required
+    auto status = pkt.getStatus();
+    if (status >= 0xE0 && status <= 0xE8) {
+        // fader pitch bend message (the channel number determines the fader number)
+        auto& fader  = faders[pkt.getChanMesChannel() - 1];
+        do_not_filter_out = fader.set_hw_fader_value(fader.extract_fader_value(pkt.getPacketBuffer()));
+    }
+    return do_not_filter_out;
+}
+
+bool rppicomidi::Midi_processor_mc_fader_pickup::feedback_one(Midi_packet& pkt)
+{
+    //return feedback_internal(pkt.getPacketBuffer());
+    // passing the message along after processing does no harm;
+    // if you are using this, your device probably ignores this packet
+    bool do_not_filter_out = true;
+    auto status = pkt.getStatus();
+    if (status >= 0xE0 && status <= 0xE8) {
+        // fader pitch bend message
+        auto& fader  = faders[pkt.getChanMesChannel() - 1];
+        fader.set_daw_fader_value(fader.extract_fader_value(pkt.getPacketBuffer()));
+    }
+    return do_not_filter_out;
+}
+
+#if 0
+bool rppicomidi::Midi_processor_mc_fader_pickup::feedback_internal(uint8_t* packet)
+{
+    // passing the message along after processing does no harm;
+    // if you are using this, your device probably ignores this packet
     bool do_not_filter_out = true;
     if (packet[1]>= 0xE0 && packet[1] <= 0xE8) {
         // fader pitch bend message
@@ -157,3 +186,4 @@ bool rppicomidi::Midi_processor_mc_fader_pickup::feedback(uint8_t* packet)
     }
     return do_not_filter_out;
 }
+#endif

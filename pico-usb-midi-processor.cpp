@@ -61,6 +61,8 @@
 #ifndef OLED_SDA_GPIO
 #define OLED_SDA_GPIO 18
 #endif
+extern "C" bool tud_midi_n_can_write_packet(uint8_t itf);
+extern "C" bool tud_midi_can_write_packet() {return tud_midi_n_can_write_packet(0); }
 namespace rppicomidi {
 class Pico_usb_midi_processor {
 public:
@@ -91,8 +93,9 @@ public:
     uint8_t* mux_map=nullptr;       // no I2C mux
 
     // the i2c driver object
-    Ssd1306i2c i2c_driver_oled{i2c1, addr, OLED_SDA_GPIO, OLED_SCL_GPIO, sizeof(addr), MUX_ADDR, mux_map};
+    Ssd1306i2cPort i2c_port_oled{i2c1, 400000, OLED_SDA_GPIO, OLED_SCL_GPIO, MUX_ADDR};
 
+    Ssd1306i2c i2c_driver_oled{&i2c_port_oled, OLED_ADDR, 0};
     Ssd1306 ssd1306;    // the SSD1306 driver object
     Mono_graphics oled_screen; // the screen object
     View_manager oled_view_manager; // the view manager object
@@ -106,6 +109,8 @@ public:
     }
     Home_screen home_screen;
     Nav_buttons nav_buttons;
+    Thread_safe_midi_buffer from_dev; // data received from the connected MIDI device
+    Thread_safe_midi_buffer from_host; // data received from the connected MIDI host
 };
 }
 
@@ -147,6 +152,7 @@ rppicomidi::Pico_usb_midi_processor::Pico_usb_midi_processor()  : addr{OLED_ADDR
     uint16_t target_done_mask = (1<<(num_displays)) -1;
     bool success = true;
     Midi_processor_manager::instance().set_screen(&oled_screen);
+    Midi_processor_manager::instance().set_buffers(&from_dev, &from_host);
     oled_view_manager.push_view(&home_screen);
     oled_screen.render_non_blocking(callback, 0);
     while (success && render_done_mask != target_done_mask) {
@@ -159,38 +165,35 @@ rppicomidi::Pico_usb_midi_processor::Pico_usb_midi_processor()  : addr{OLED_ADDR
 
 void rppicomidi::Pico_usb_midi_processor::poll_midi_dev_rx()
 {
-    static bool inSysEx = false;
     // device must be attached and have at least one endpoint ready to receive a message
     uint8_t packet[4];
-    while (tud_midi_packet_read(packet)) {
-        uint8_t cable = Midi_processor::get_cable_num(packet);
-        if (cable == 0) {
-          if (packet[1] == 0xf0) {
-            inSysEx = true;
-          }
-          if (inSysEx) {
-            uint8_t nPrint = 3;
-            if (packet[3] == 0xf7) {
-                inSysEx = false;
-            }
-            else if (packet[2] == 0xf7) {
-                nPrint = 2;
-            }
-            else if (packet[1] == 0xf7) {
-                nPrint = 1;
-            }
-            for (uint8_t idx = 1; idx <= nPrint; idx++) {
-                printf("%02x ", packet[idx]);
-            }
-            if (!inSysEx) {
-                printf("\r\n");
-            }
-          }
 
+    from_host.lock();
+    while (tud_midi_packet_read(packet)) {
+        Midi_packet pkt;
+        pkt.setPacket(packet);
+        from_host.push(pkt);
+        //printf("poll_midi_dev_rx: pushed 0x%08lx\r\n", pkt.getPacket());
+    }
+    size_t pkts_remaining = from_host.getSize();
+    from_host.unlock();
+    while(pkts_remaining > 0) {
+        Midi_packet pkt;
+        auto buf = rppicomidi::Midi_processor_manager::instance().filter_midi_out();
+        // All processing in the chain is complete; send any packets still in the chain
+        while(buf->pop(pkt)) {
+            if (!tuh_midi_can_write_stream(midi_dev_addr)) {
+                // USB endpoint write buffer is full; try flushing the buffer and then retry packet write
+                tuh_midi_stream_flush(midi_dev_addr);
+                while (!tuh_midi_can_write_stream(midi_dev_addr)) {
+                    //tuh_task() is called from the other processor core
+                }
+            }
+            tuh_midi_packet_write(midi_dev_addr, pkt.getPacketBuffer());
         }
-        if (Midi_processor_manager::instance().filter_midi_out(cable, packet)) {
-            tuh_midi_packet_write(rppicomidi::Pico_usb_midi_processor::instance().midi_dev_addr, packet);
-        }
+        from_host.lock();
+        pkts_remaining = from_host.getSize();
+        from_host.unlock();
     }
 }
 
@@ -215,7 +218,20 @@ void rppicomidi::Pico_usb_midi_processor::task()
         tud_task();
         if (tud_midi_mounted()) {
             poll_midi_dev_rx();
-            Midi_processor_manager::instance().task();
+            auto buf = rppicomidi::Midi_processor_manager::instance().run_midi_out_tasks();
+            Midi_packet pkt;
+            // All processing in the chain is complete; send any packets still in the chain
+            while(buf->pop(pkt)) {
+                if (!tuh_midi_can_write_stream(midi_dev_addr)) {
+                    // USB endpoint write buffer is full; try flushing the buffer and then retry packet write
+                    tuh_midi_stream_flush(midi_dev_addr);
+                    while (!tuh_midi_can_write_stream(midi_dev_addr)) {
+                        //tuh_task() is called on the other processor core
+                    }
+                }
+                tuh_midi_packet_write(midi_dev_addr, pkt.getPacketBuffer());
+            }
+
         }
     }
     else if (midi_device_status == MIDI_DEVICE_MSC_ATTACHED) {
@@ -266,7 +282,49 @@ static void midi_host_app_task(void)
         clone_next_string();
     }
     else if (descriptors_are_cloned()) {
-        tuh_midi_stream_flush(rppicomidi::Pico_usb_midi_processor::instance().midi_dev_addr );
+        // First, process packets from the attached MIDI device and send them up to the host via the RP2's USB device interface
+        uint8_t dev_addr = rppicomidi::Pico_usb_midi_processor::instance().midi_dev_addr;
+        rppicomidi::Pico_usb_midi_processor::instance().from_dev.lock();
+        size_t pkts_remaining = rppicomidi::Pico_usb_midi_processor::instance().from_dev.getSize();
+        rppicomidi::Pico_usb_midi_processor::instance().from_dev.unlock();
+        while(pkts_remaining > 0) {
+            Midi_packet pkt;
+            auto buf = rppicomidi::Midi_processor_manager::instance().filter_midi_in();
+            // All processing in the chain is complete; send any packets still in the chain to the USB Device port
+            while(buf->pop(pkt)) {
+                //printf("packet received from MIDI Device 0x%08lx, filter output buf size=%u\r\n", pkt.getPacket(), buf->getSize());
+                // Send  packets to the attached MIDI Device
+                if (!tud_midi_packet_write(pkt.getPacketBuffer())) {
+                    // packet writes will flush the buffer automatically. Just need to poll until the transfer is complete
+                    while(!tud_midi_can_write_packet()) {
+                        //tud_task() is called from the other processor core
+                    }
+                    // the write will succeed now
+                    tud_midi_packet_write(pkt.getPacketBuffer());
+                }
+            }
+            rppicomidi::Pico_usb_midi_processor::instance().from_dev.lock();
+            pkts_remaining = rppicomidi::Pico_usb_midi_processor::instance().from_dev.getSize();
+            rppicomidi::Pico_usb_midi_processor::instance().from_dev.unlock();
+        }
+        // Next execute all processors that have a task that sent packets to the host computer's MIDI IN
+        auto buf = rppicomidi::Midi_processor_manager::instance().run_midi_in_tasks();
+        if (!buf->isEmpty()) {
+            Midi_packet pkt;
+            while(buf->pop(pkt)) {
+                // Send  packets to the attached MIDI Device
+                if (!tud_midi_packet_write(pkt.getPacketBuffer())) {
+                    // packet writes will flush the buffer automatically. Just need to poll until the transfer is complete
+                    while(!tud_midi_can_write_packet()) {
+                        //tud_task() is called from the other processor core
+                    }
+                    // the write will succeed now
+                    tud_midi_packet_write(pkt.getPacketBuffer());
+                }
+            }
+        }
+        // Finally, flush the MIDI Host output stream buffer
+        tuh_midi_stream_flush(dev_addr);
     }
 }
 
@@ -365,7 +423,7 @@ int main()
     rppicomidi::Settings_file::instance().add_all_cli_commands(cli);
     msc_fat_init();
 
-    TU_LOG1("pico-usb-midi-processor\r\n");
+    printf("pico-usb-midi-processor\r\n");
     while(getchar_timeout_us(0) != PICO_ERROR_TIMEOUT) {
         // flush out the console input buffer
     }
@@ -428,15 +486,15 @@ void tuh_midi_umount_cb(uint8_t dev_addr, uint8_t instance)
 void tuh_midi_rx_cb(uint8_t dev_addr, uint32_t num_packets)
 {
     if (rppicomidi::Pico_usb_midi_processor::instance().midi_dev_addr == dev_addr) {
-        while (num_packets>0) {
-            --num_packets;
+        if (num_packets>0) {
             uint8_t packet[4];
+            Midi_packet pkt;
+            rppicomidi::Pico_usb_midi_processor::instance().from_dev.lock();
             while (tuh_midi_packet_read(dev_addr, packet)) {
-                uint8_t cable = rppicomidi::Midi_processor::get_cable_num(packet);
-                if (rppicomidi::Midi_processor_manager::instance().filter_midi_in(cable, packet)) {
-                    tud_midi_packet_write(packet);
-                }
+                pkt.setPacket(packet);
+                rppicomidi::Pico_usb_midi_processor::instance().from_dev.push(pkt);
             }
+            rppicomidi::Pico_usb_midi_processor::instance().from_dev.unlock();
         }
     }
 }

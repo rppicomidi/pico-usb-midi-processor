@@ -30,13 +30,77 @@
 #include <cstdint>
 #include <cstring>
 #include <cstdio>
+#include <vector>
+#include <pico/mutex.h>
 #include "parson.h"
+#include "lib/CircularBuffer/CircularBuffer.tpp"
+#include "lib/CircularBuffer/example/usb_midi_packet.h"
 namespace rppicomidi
 {
+    // Make a 32-packet MIDI buffer class
+class Midi_buffer : public CircularBuffer<Midi_packet, 32>
+{
+public:
+    Midi_buffer() {
+        reset();
+    }
+};
+
+class Midi_processor;
+
+/**
+ * @brief Midi_processor ptr with a flag to choose whether to call the process() 
+ * or feedback() function
+ */
+struct Midi_processor_fn
+{   
+    Midi_processor* proc;   //!< pointer to the Midi_processor whose process() or feedback() function is called
+    bool is_feedback;       //!< if true, call proc->feedback(); otherwise call proc->process().
+};
+
+/**
+ * This is data that the Midi_processor_manager uses to schedule task()
+ * outputs when task() pushes to the proc_buf
+ */
+struct Midi_processor_chain_info
+{
+    Midi_processor_chain_info() : fn_list{nullptr}, idx{0}, chain{0} {}
+    std::vector<std::vector<Midi_processor_fn>>* fn_list;
+    size_t idx;
+    uint8_t chain;
+};
+
+class Thread_safe_midi_buffer : public Midi_buffer
+{
+public:
+    Thread_safe_midi_buffer() : Midi_buffer() {
+        reset();
+        mutex_init(&mtx);
+    }
+    void lock() {mutex_enter_blocking(&mtx);}
+    void unlock() {mutex_exit(&mtx); }
+protected:
+    mutex mtx;
+};
+
 class Midi_processor
 {
 public:
-    Midi_processor(const char* name_, uint16_t unique_id_) : dirty{true}, unique_id{unique_id_}
+    /** 
+     * @brief construct a Midi_processor object
+     *
+     * @param name_ the human readable name of the processor
+     * @param unique_id_ a unique ID number for this processor object instance
+     * @param proc_buf_ a reference to the buffer from which the process() function's inputs come
+     * @param in_buf_ a reference to the buffer to which process() outputs on a new chain get written
+     * @param fb_buf_ a reference to the buffer from which the feedback() function's inputs come
+     * @param out_buf_ a reference to the buffer to which feedback() outputs on a new chain get written
+     *
+     * @note that the process() function can write to the out_buf_ in order to "loop back" data
+     * Similarly, the feedback() function can write to the in_buf_ in order to "loop back" data
+    */
+    Midi_processor(const char* name_, uint16_t unique_id_, Midi_buffer* proc_buf_, Thread_safe_midi_buffer* in_buf_, Midi_buffer* fb_buf_, Thread_safe_midi_buffer* out_buf_) : 
+        dirty{true}, unique_id{unique_id_}, proc_buf{proc_buf_}, in_buf{in_buf_}, fb_buf{fb_buf_}, out_buf{out_buf_}
     {
         strncpy(name, name_, max_name_length);
         name[max_name_length] = '\0';
@@ -49,6 +113,7 @@ public:
         else {
             feedback_name[0] = '\0';
         }
+        printf("proc_buf=%p\r\n",proc_buf);
     }
 
     virtual ~Midi_processor() = default;
@@ -70,14 +135,22 @@ public:
     const char* get_unique_name() {return unique_name; }
 
     const char* get_feedback_name() { return has_feedback_process() ? feedback_name : nullptr; }
+
+    virtual bool process_one(Midi_packet& pkt) {(void)pkt; return true;}
     /**
      * @brief perform the main processing from this input
-     *
-     * @param packet a pointer to the USB MIDI data packet to process 
-     * @return true if data should be transmitted on
-     * @return false to filter out the data
      */
-    virtual bool process(uint8_t* packet) {(void)packet; return true; }
+    virtual void process() {
+        size_t npackets = proc_buf->getSize();
+        for (size_t idx=0; idx < npackets; idx++) {
+            Midi_packet pkt;
+            if (!proc_buf->pop(pkt))
+                break;
+            if (process_one(pkt)) {
+                proc_buf->push(pkt);
+            }
+        }
+    }
 
     /**
      * @brief Determine if this processor has a feedback process
@@ -100,25 +173,48 @@ public:
 
     /**
      * @brief perform processing of a feedback message from the opposite direction
-     *
-     * @return true if data should be transmitted on
-     * @return false
-     * @note usually there is no feedback process;
      */
-    virtual bool feedback(uint8_t* packet) {(void)packet; return false;}
+    virtual void feedback() {
+        size_t npackets = fb_buf->getSize();
+        for (size_t idx=0; idx < npackets; idx++) {
+            Midi_packet pkt;
+            if (!fb_buf->pop(pkt))
+                break;
+            if (feedback_one(pkt)) {
+                fb_buf->push(pkt);
+            }
+        }
+    }
+
+    virtual bool feedback_one(Midi_packet& pkt) {(void)pkt; return true; }
 
     /**
      * @brief determine if this process has a periodic process task
      *
      * @return true if the task() method does anything
      */
-    bool has_task() {return false; }
+    virtual bool has_task() {return false; }
 
     /**
      * @brief Perform any periodic processing that this process needs
-     * 
+     *
+     * @note any output from this task goes to the in_buf.
      */
     virtual void task() {}
+
+    /**
+     * @brief determine if this process has a periodic process task
+     *
+     * @return true if the task() method does anything
+     */
+    virtual bool has_fb_task() {return false; }
+
+    /**
+     * @brief Perform any periodic processing that this process needs
+     *
+     * @note any output from this task goes to the out_buf.
+     */
+    virtual void fb_task() {}
 
     /**
      * @brief Determine if any of the processor's settings have changed since
@@ -198,7 +294,8 @@ public:
         }
         return channel;
     }
-
+    void set_chain_info(Midi_processor_chain_info* info) { chain_info = *info;}
+    const Midi_processor_chain_info* get_chain_info() const {return &chain_info; }
 protected:
     static const uint8_t max_name_length=21;
     char unique_name[max_name_length+6];
@@ -206,5 +303,10 @@ protected:
     char feedback_name[max_name_length+9];
     bool dirty; // if true, then the settings need to be saved 
     uint16_t unique_id;
+    Midi_buffer* proc_buf;
+    Thread_safe_midi_buffer* in_buf;
+    Midi_buffer* fb_buf;
+    Thread_safe_midi_buffer* out_buf;
+    Midi_processor_chain_info chain_info;
 };
 }

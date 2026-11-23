@@ -49,18 +49,8 @@ namespace rppicomidi
 class Midi_processor_manager
 {
 private:
-    typedef Midi_processor* (*mp_factory_fn)(uint16_t unique_id);
+    typedef Midi_processor* (*mp_factory_fn)(uint16_t unique_id_, Midi_buffer* proc_buf_, Thread_safe_midi_buffer* in_buf_, Midi_buffer* fb_buf_, Thread_safe_midi_buffer* out_buf_);
     typedef Midi_processor_settings_view* (*mpsv_factory_fn)(Mono_graphics& screen_, const Rectangle& rect_, Midi_processor* proc_);
-    /**
-     * @brief Midi_processor ptr with a flag to choose whether to call the process() 
-     * or feedback() function
-     */
-    struct Midi_processor_fn
-    {   
-        Midi_processor* proc;   //!< pointer to the Midi_processor whose process() or feedback() function is called
-        bool is_feedback;       //!< if true, call proc->feedback(); otherwise call proc->process().
-    };
-
 public:
     // Singleton Pattern
 
@@ -192,24 +182,39 @@ public:
      * @return true if the packet should be sent to the Pico's USB device interface
      * @return false if the packet should be discarded
      */
-    bool filter_midi_in(uint8_t cable_, uint8_t* packet_);
+    Midi_buffer* filter_midi(Thread_safe_midi_buffer* buf, Midi_buffer* p_buf, std::vector<std::vector<Midi_processor_fn>>& proc_fn_list);
 
     /**
-     * @brief process the MIDI OUT packet sent to the connected device on the specified virtual cable 
-     * 
-     * @param cable_ the USB MIDI virtual cable number. (yes, it is also in the packet; this is for future
-     * when I may switch to streams instead of USB packets)
-     * @param packet_ the 4-byte USB MIDI packet
-     * @return true if the packet should be sent to the connected MIDI Device
-     * @return false if the packet should be discarded
+     * @brief process the data from the attached MIDI device
+     *
+     * @return a reference that contains 0 or more packets of filter output
      */
-    bool filter_midi_out(uint8_t cable_, uint8_t* packet_);
+    Midi_buffer* filter_midi_in() {
+        return filter_midi(in_buf, &proc_buf, midi_in_proc_fns);
+    }
 
     /**
-     * @brief execute the task() functions for all Midi_processor objects
-     * that have a task() function that does anything
+     * @brief process the MIDI packets from the USB Host computer
+     *
+     * @return a reference that contains 0 or more packets of filter output
      */
-    void task();
+    Midi_buffer* filter_midi_out() {
+        return filter_midi(out_buf, &fb_buf, midi_out_proc_fns);
+    }
+
+    /**
+     * @brief run all tasks that output to proc_buf
+     *
+     * @return a pointer to proc_buf
+     */
+    Midi_buffer* run_midi_in_tasks();
+
+    /**
+     * @brief run all tasks that output to fb_buf
+     *
+     * @return a pointer to fb_buf
+     */
+    Midi_buffer* run_midi_out_tasks();
 
     /**
      * @brief Set the screen object
@@ -219,6 +224,11 @@ public:
      * @param screen_ a pointer to the screen that displays the settings
      */
     void set_screen(Mono_graphics* screen_) {screen = screen_;}
+
+    void set_buffers(Thread_safe_midi_buffer* in_buf_, Thread_safe_midi_buffer* out_buf_) {
+        in_buf = in_buf_;
+        out_buf = out_buf_;
+    }
 
     /**
      * @brief serialize to a JSON-formatted string the current settings
@@ -312,6 +322,12 @@ private:
      */
     void build_processor_structures();
 
+    /**
+     * @brief execute the task() functions for all Midi_processor objects
+     * that have a task() function that does anything
+     */
+    Midi_buffer* task(std::vector<Midi_processor*>& processors_with_tasks, Midi_buffer* task);
+
     struct Mpf_element {
         const char* name;
         mp_factory_fn processor;
@@ -328,12 +344,17 @@ private:
     std::vector<std::vector<Mpv_element>> midi_out_processors;
     std::vector<std::vector<Midi_processor_fn>> midi_in_proc_fns;
     std::vector<std::vector<Midi_processor_fn>> midi_out_proc_fns;
-    std::vector<Midi_processor*> processors_with_tasks;
+    std::vector<Midi_processor*> midi_in_with_tasks;
+    std::vector<Midi_processor*> midi_out_with_tasks;
     Mono_graphics* screen;
     //Settings_file settings_file;
     Setting_number<uint8_t> current_preset;
     bool dirty;
     char id_str[10];
     char prod_str[MAX_PROD_STR_NAME+1];
+    Midi_buffer proc_buf;
+    Midi_buffer fb_buf;
+    Thread_safe_midi_buffer* in_buf;
+    Thread_safe_midi_buffer* out_buf;
 };
 }

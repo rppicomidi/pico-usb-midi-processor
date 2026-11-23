@@ -42,8 +42,11 @@ namespace rppicomidi
 class Midi_processor_chan_mes_remap : public Midi_processor
 {
 public:
-    Midi_processor_chan_mes_remap(const char* name_, uint16_t unique_id);
-    Midi_processor_chan_mes_remap(uint16_t unique_id) : Midi_processor_chan_mes_remap(static_getname(), unique_id) {}
+    Midi_processor_chan_mes_remap(const char* name_, uint16_t unique_id, 
+        Midi_buffer* proc_buf_, Thread_safe_midi_buffer* in_buf_, Midi_buffer* fb_buf_, Thread_safe_midi_buffer* out_buf_);
+    Midi_processor_chan_mes_remap(uint16_t unique_id, Midi_buffer* proc_buf_, Thread_safe_midi_buffer* in_buf_, 
+        Midi_buffer* fb_buf_, Thread_safe_midi_buffer* out_buf_) : 
+            Midi_processor_chan_mes_remap(static_getname(), unique_id, proc_buf_, in_buf_, fb_buf_, out_buf_) {}
     Midi_processor_chan_mes_remap() = delete;
     virtual ~Midi_processor_chan_mes_remap()=default;
     size_t add_remap()
@@ -59,7 +62,8 @@ public:
         bimap.erase(idx);
         mutex_exit(&processing_mutex);
     }
-    bool process(uint8_t *packet) final { return process_internal(packet, 0, 1); }
+    bool process_one(Midi_packet& pkt);
+
     virtual bool has_feedback_process() {return false; }
     const std::vector<std::string>* get_all_possible_channel_message_types() const { return message_type.get_all_possible_values(); }
     bool set_message_type(size_t idx) { dirty = message_type.get_ivalue() != (int)idx; return message_type.set(idx); }
@@ -101,9 +105,11 @@ public:
         return newval;
     }
     static const char *static_getname() { return "Channel Message Remap"; }
-    static Midi_processor* static_make_new(uint16_t unique_id_) { return new Midi_processor_chan_mes_remap(unique_id_); }
+    static Midi_processor* static_make_new(uint16_t unique_id_, Midi_buffer* proc_buf_, Thread_safe_midi_buffer* in_buf_, Midi_buffer* fb_buf_, Thread_safe_midi_buffer* out_buf_) {
+        return new Midi_processor_chan_mes_remap(unique_id_, proc_buf_, in_buf_, fb_buf_, out_buf_);
+    }
 protected:
-    bool process_internal(uint8_t *packet, size_t first_idx, size_t second_idx);
+    bool process_internal(Midi_packet&pkt, size_t first_idx, size_t second_idx);
     const std::string note_msg;
     const std::string cc_msg;
     const std::string poly_pressure_msg;

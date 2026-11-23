@@ -23,9 +23,10 @@
 #include "midi_processor_raw_remap.h"
 #include "parson.h"
 
-bool rppicomidi::Midi_processor_raw_remap::process(uint8_t* packet)
+bool rppicomidi::Midi_processor_raw_remap::process_one(Midi_packet& pkt)
 {
     // byte 0 of the packet is code index number/cable number byte
+    auto packet = pkt.getPacketBuffer();
     if (packet[1] == in_mes.get(0) && packet[2] == in_mes.get(1) && packet[3] == in_mes.get(2)) {
         packet[1] = out_mes.get(0);
         packet[2] = out_mes.get(1);

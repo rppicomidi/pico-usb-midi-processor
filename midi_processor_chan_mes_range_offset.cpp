@@ -23,8 +23,10 @@
 
 #include "midi_processor_chan_mes_range_offset.h"
 #include "class/midi/midi.h"
-rppicomidi::Midi_processor_chan_mes_range_offset::Midi_processor_chan_mes_range_offset(const char* name_, uint16_t unique_id) :
-    Midi_processor{name_, unique_id}, note_off_msg{"Note Off"}, note_on_msg{"Note On"}, cc_msg{"CC"},
+rppicomidi::Midi_processor_chan_mes_range_offset::Midi_processor_chan_mes_range_offset(uint16_t unique_id,
+    Midi_buffer* proc_buf_, Thread_safe_midi_buffer* in_buf_, Midi_buffer* fb_buf_, Thread_safe_midi_buffer* out_buf_) :
+    Midi_processor{static_getname(), unique_id, proc_buf_, in_buf_, fb_buf_, out_buf_},
+    note_off_msg{"Note Off"}, note_on_msg{"Note On"}, cc_msg{"CC"},
     poly_pressure_msg{"Poly Pressure"}, chan_pressure_msg{"Chan Pressure"}, prog_change_msg{"Prog Change"},
     format_decimal{"Display Decimal"}, format_hex{"Display Hex"},
     chan_in{"Channel In", 1, 16, 1},
@@ -42,13 +44,12 @@ rppicomidi::Midi_processor_chan_mes_range_offset::Midi_processor_chan_mes_range_
     byte2_range.push_back(0,0);
 }
 
-bool rppicomidi::Midi_processor_chan_mes_range_offset::process(uint8_t* packet)
+bool rppicomidi::Midi_processor_chan_mes_range_offset::process_one(Midi_packet& pkt)
 {
-    uint8_t msg_chan = Midi_processor::get_channel_num(packet);
-    if (msg_chan == chan_in.get()) {
+    if (pkt.getChanMesChannel() == chan_in.get()) {
         //printf("got channel match\r\n");
         // got a channel message on the right channel. See if it is the right type to process
-        uint8_t status = (packet[1] >> 4) & 0xf;
+        uint8_t status = pkt.getChanMesCin();
         uint8_t in_msg_status = message_type_in.get_ivalue() + 0x8;
         uint8_t out_msg_status = message_type_out.get_ivalue() + 0x8;
         //printf("status=%02x in_msg_status=%02x\r\n",status, in_msg_status);
@@ -56,25 +57,24 @@ bool rppicomidi::Midi_processor_chan_mes_range_offset::process(uint8_t* packet)
         {
             //printf("got status match\r\n");
             // found the right channel message type. Are the bytes in range?
-            if (packet[2] >= byte1_range.get(0,0) && packet[2] <= byte1_range.get(0,1) &&
-                ((packet[3] >= byte2_range.get(0,0) && packet[3] <= byte2_range.get(0,1)) || 
+            if (pkt.getData1() >= byte1_range.get(0,0) && pkt.getData1() <= byte1_range.get(0,1) &&
+                ((pkt.getData2() >= byte2_range.get(0,0) && pkt.getData2() <= byte2_range.get(0,1)) || 
                     status == MIDI_CIN_CHANNEL_PRESSURE  || status == MIDI_CIN_PROGRAM_CHANGE)) {
                 //printf("got byte range match\r\n");
                 mutex_enter_blocking(&processing_mutex);
-                // Fix up the cin in byte 0 and remap the channel message status
-                packet[0] &= 0xf0;
-                packet[0] |= out_msg_status;
-                packet[1] = (out_msg_status << 4) | (chan_out.get()-1);
+                // Fix up the cin in byte 0 and remap the channel message status and channel
+                pkt.setChanMesCin(out_msg_status);
+                pkt.setChanMesChannel(chan_out.get());
                 bool in_is_2_byte_msg = in_msg_status >= MIDI_CIN_PROGRAM_CHANGE;
                 bool out_is_2_byte_msg = out_msg_status >= MIDI_CIN_PROGRAM_CHANGE;
-                int byte1 = packet[2] + byte1_offset.get();
+                int byte1 = pkt.getData1() + byte1_offset.get();
                 if (byte1 < 0) {
                     byte1 = 0;
                 }
                 if (byte1 > 127) {
                     byte1 = 127;
                 }
-                int byte2 = packet[3] + byte2_offset.get();
+                int byte2 = pkt.getData2() + byte2_offset.get();
                 if (byte2 < 0) {
                     byte2 = 0;
                 }
@@ -82,19 +82,19 @@ bool rppicomidi::Midi_processor_chan_mes_range_offset::process(uint8_t* packet)
                     byte2 = 127;
                 }
                 if (in_is_2_byte_msg == out_is_2_byte_msg) {
-                    packet[2] = byte1;
+                    pkt.setData1(byte1);
                     if (!out_is_2_byte_msg) {
-                        packet[3] = byte2;
+                        pkt.setData2(byte2);
                     }
                 }
                 else if (in_is_2_byte_msg) {
                     // Then the byte 2 offset value is the byte 1 value, and the computed offset byte1 value is the new byte 2
-                    packet[2] = byte2_offset.get();
-                    packet[3] = byte1;
+                    pkt.setData1(byte2_offset.get());
+                    pkt.setData2(byte1);
                 }
                 else { // mapping a range of 3 byte message values to a single 2-byte message
                     // The byte 2 value is the new byte 1 value
-                    packet[2] = byte2;
+                    pkt.setData1(byte2);
                     // packet[3] is unused
                 }
                 mutex_exit(&processing_mutex);

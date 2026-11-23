@@ -30,7 +30,9 @@ namespace rppicomidi
 class Midi_processor_transpose : public Midi_processor
 {
 public:
-    Midi_processor_transpose(uint16_t unique_id) : Midi_processor{static_getname(), unique_id},
+    Midi_processor_transpose(uint16_t unique_id, Midi_buffer* proc_buf_, 
+        Thread_safe_midi_buffer* in_buf_, Midi_buffer* fb_buf_, Thread_safe_midi_buffer* out_buf_) : 
+        Midi_processor{static_getname(), unique_id, proc_buf_, in_buf_, fb_buf_, out_buf_},
         chan{"chan", 1, 16, 1}, min_note{"min_note", 0, 127, 0}, max_note{"max_note", 0, 127, 127},
         transpose_delta("transpose_delta", -12, 12, 0),
         format_decimal{"Display Decimal"}, format_hex{"Display Hex"},
@@ -40,7 +42,7 @@ public:
         load_defaults();
     }
     virtual ~Midi_processor_transpose()=default;
-    bool process(uint8_t* packet) final;
+    bool process_one(Midi_packet& pkt) final;
     static uint8_t static_get_chan(void* context)
     {
         auto me = reinterpret_cast<Midi_processor_transpose*>(context);
@@ -115,7 +117,9 @@ public:
 
     // The following are manditory static methods to enable the Midi_processor_manager class
     static const char* static_getname() { return "Transpose"; }
-    static Midi_processor* static_make_new(uint16_t unique_id_) {return new Midi_processor_transpose(unique_id_); }
+    static Midi_processor* static_make_new(uint16_t unique_id_, Midi_buffer* proc_buf_, Thread_safe_midi_buffer* in_buf_, Midi_buffer* fb_buf_, Thread_safe_midi_buffer* out_buf_) {
+        return new Midi_processor_transpose(unique_id_, proc_buf_, in_buf_, fb_buf_, out_buf_);
+    }
 protected:
     Setting_number<uint8_t> chan;           //!< MIDI Channel Number from 1
     Setting_number<uint8_t> min_note;       //!< Minimum note number to transpose 0-127

@@ -132,20 +132,25 @@ private:
 class Midi_processor_mc_fader_pickup : public Midi_processor
 {
 public:
-    Midi_processor_mc_fader_pickup(uint16_t unique_id_, uint16_t sync_delta_=0x7f) : Midi_processor(static_getname(), unique_id_)
+    Midi_processor_mc_fader_pickup(uint16_t unique_id_, Midi_buffer* proc_buf_, Thread_safe_midi_buffer* in_buf_, Midi_buffer* fb_buf_, Thread_safe_midi_buffer* out_buf_, uint16_t sync_delta_=0x7f)
+         : Midi_processor(static_getname(), unique_id_, proc_buf_, in_buf_, fb_buf_, out_buf_)
     {
         for (int fader=0; fader< num_faders; fader++)
             faders[fader].init(sync_delta_);
     }
     virtual ~Midi_processor_mc_fader_pickup()=default;
-    bool process(uint8_t* packet) final;
-    bool feedback(uint8_t* packet) final;
+    bool process_one(Midi_packet& pkt) final;
+    bool feedback_one(Midi_packet& pkt) final;
     bool has_feedback_process() final {return true; }
     // The following are manditory static methods to enable the Midi_processor_manager class
     static const char* static_getname() { return "MC Fader Pickup"; }
-    static Midi_processor* static_make_new(uint16_t unique_id_) { return new Midi_processor_mc_fader_pickup(unique_id_); }
+    static Midi_processor* static_make_new(uint16_t unique_id_, Midi_buffer* proc_buf_, Thread_safe_midi_buffer* in_buf_, Midi_buffer* fb_buf_, Thread_safe_midi_buffer* out_buf_) {
+        return new Midi_processor_mc_fader_pickup(unique_id_, proc_buf_, in_buf_, fb_buf_, out_buf_);
+    }
 private:
     static const uint8_t num_faders=9;
     Mc_fader_pickup faders[num_faders];
+    //bool process_internal(uint8_t* packet);
+    //bool feedback_internal(uint8_t* packet);
 };
 }

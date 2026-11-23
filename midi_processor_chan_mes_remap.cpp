@@ -23,8 +23,9 @@
 
 #include "midi_processor_chan_mes_remap.h"
 #include "class/midi/midi.h"
-rppicomidi::Midi_processor_chan_mes_remap::Midi_processor_chan_mes_remap(const char* name_, uint16_t unique_id) :
-    Midi_processor{name_, unique_id}, note_msg{"Note Number Remap"}, cc_msg{"CC Number Remap"},
+rppicomidi::Midi_processor_chan_mes_remap::Midi_processor_chan_mes_remap(const char* name_, uint16_t unique_id, Midi_buffer* proc_buf_, Thread_safe_midi_buffer* in_buf_, Midi_buffer* fb_buf_, Thread_safe_midi_buffer* out_buf_) :
+    Midi_processor{name_, unique_id, proc_buf_, in_buf_, fb_buf_, out_buf_},
+    note_msg{"Note Number Remap"}, cc_msg{"CC Number Remap"},
     poly_pressure_msg{"Poly Press Note Remap"}, chan_pressure_msg{"Chan Pressure Remap"}, prog_change_msg{"Program Number Remap"},
     format_decimal{"Display Decimal"}, format_hex{"Display Hex"},
     chan{"Channel", 1, 16, 1}, message_type{"Channel Message", {note_msg, cc_msg, poly_pressure_msg, chan_pressure_msg, prog_change_msg}},
@@ -34,26 +35,17 @@ rppicomidi::Midi_processor_chan_mes_remap::Midi_processor_chan_mes_remap(const c
     mutex_init(&processing_mutex);
 }
 
-#if 0
-rppicomidi::Midi_processor_chan_mes_remap::Midi_processor_chan_mes_remap(uint16_t unique_id) :
-    Midi_processor{static_getname(), unique_id}, note_msg{"Note Number Remap"}, cc_msg{"CC Number Remap"},
-    poly_pressure_msg{"Poly Press Note Remap"}, chan_pressure_msg{"Chan Pressure Remap"}, prog_change_msg{"Program Number Remap"},
-    format_decimal{"Display Decimal"}, format_hex{"Display Hex"},
-    chan{"Channel", 1, 16, 1}, message_type{"Channel Message", {note_msg, cc_msg, poly_pressure_msg, chan_pressure_msg, prog_change_msg}},
-    bimap{"remap",0,128 /* if the remap is 128, it means the message packet should be filtered out */ },
-    display_format{"Display Format", {format_decimal, format_hex}}
+bool rppicomidi::Midi_processor_chan_mes_remap::process_one(Midi_packet& pkt)
 {
-    mutex_init(&processing_mutex);
+    return process_internal(pkt, 0 ,1);
 }
-#endif
 
-bool rppicomidi::Midi_processor_chan_mes_remap::process_internal(uint8_t* packet, size_t first_idx, size_t second_idx)
+bool rppicomidi::Midi_processor_chan_mes_remap::process_internal(Midi_packet& pkt, size_t first_idx, size_t second_idx)
 {
     bool donotfilter = true;
-    uint8_t msg_chan = Midi_processor::get_channel_num(packet);
-    if (msg_chan == chan.get()) {      
+    if (pkt.getChanMesChannel() == chan.get()) {      
         // got a channel message on the right channel. See if it is the right type to process
-        uint8_t status = (packet[1] >> 4) & 0xf;
+        uint8_t status = pkt.getChanMesCin();
         if (((status == MIDI_CIN_NOTE_ON || status == MIDI_CIN_NOTE_OFF) && message_type == note_msg) ||
             (status == MIDI_CIN_CONTROL_CHANGE && message_type == cc_msg) ||
             (status == MIDI_CIN_POLY_KEYPRESS && message_type == poly_pressure_msg) ||
@@ -62,7 +54,7 @@ bool rppicomidi::Midi_processor_chan_mes_remap::process_internal(uint8_t* packet
          {
             // found the right channel message type. Remap it
             mutex_enter_blocking(&processing_mutex);
-            int idx = bimap.find(packet[2], first_idx);
+            int idx = bimap.find(pkt.getData1(), first_idx);
             if (idx != -1) {
                 uint8_t remap=bimap.get(idx, second_idx);
                 if (remap == bimap.get_max()) {
@@ -70,7 +62,7 @@ bool rppicomidi::Midi_processor_chan_mes_remap::process_internal(uint8_t* packet
                     donotfilter = false;
                 }
                 else {
-                    packet[2]=remap;
+                    pkt.setData1(remap);
                 }
             }
             mutex_exit(&processing_mutex);
