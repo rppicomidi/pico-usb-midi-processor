@@ -22,3 +22,6 @@
 [submodule "lib/rp2xxx_rtc_lib"]
 	path = lib/rp2xxx_rtc_lib
 	url = https://github.com/rppicomidi/rp2xxx_rtc_lib.git
+[submodule "lib/CircularBuffer"]
+	path = lib/CircularBuffer
+	url = https://github.com/rppicomidi/CircularBuffer.git
