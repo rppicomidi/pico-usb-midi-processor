@@ -51,6 +51,8 @@ target_sources(midi_processor PRIVATE
  midi_processor_clock_generator.h
  midi_processor_clock_generator_settings_view.cpp
  midi_processor_clock_generator_settings_view.h
+ midi_processor_clock_receiver.cpp
+ midi_processor_clock_receiver_settings_view.cpp
  preset_view.cpp
  clock_set_view.cpp
  backup_view.cpp

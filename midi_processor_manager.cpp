@@ -36,6 +36,8 @@
 #include "midi_processor_pitchbend_to_cc_settings_view.h"
 #include "midi_processor_clock_generator.h"
 #include "midi_processor_clock_generator_settings_view.h"
+#include "midi_processor_clock_receiver.h"
+#include "midi_processor_clock_receiver_settings_view.h"
 
 uint16_t rppicomidi::Midi_processor_manager::unique_id = 0;
 rppicomidi::Midi_processor_manager::Midi_processor_manager() : screen{nullptr}, current_preset{"current preset",1,8,1}, dirty{true}
@@ -58,6 +60,8 @@ rppicomidi::Midi_processor_manager::Midi_processor_manager() : screen{nullptr}, 
                         Midi_processor_pitchbend_to_cc_settings_view::static_make_new});
     proclist.push_back({Midi_processor_clock_generator::static_getname(), Midi_processor_clock_generator::static_make_new,
                         Midi_processor_clock_generator_settings_view::static_make_new});
+    proclist.push_back({Midi_processor_clock_receiver::static_getname(), Midi_processor_clock_receiver::static_make_new,
+                        Midi_processor_clock_receiver_settings_view::static_make_new});
     *id_str = '\0';
     *prod_str = '\0';
     Settings_file::instance(); // construct the Settings_file instance
