@@ -207,7 +207,15 @@ void rppicomidi::Midi_processor_manager::build_processor_structures()
                 info.fn_list = &midi_in_proc_fns;
                 info.idx = idx;
                 midi_in_proc.proc->set_chain_info(&info);
-                midi_in_with_tasks.push_back(midi_in_proc.proc);
+                midi_in_with_tasks.push_back({midi_in_proc.proc, false});
+            }
+            if (midi_in_proc.proc->has_fb_task()) {
+                Midi_processor_chain_info info;
+                info.chain = cable;
+                info.fn_list = &midi_out_proc_fns;
+                info.idx = idx;
+                midi_in_proc.proc->set_fb_chain_info(&info);
+                midi_out_with_tasks.push_back({midi_in_proc.proc, true});
             }
             ++idx;
         }
@@ -231,7 +239,15 @@ void rppicomidi::Midi_processor_manager::build_processor_structures()
                 info.fn_list = &midi_out_proc_fns;
                 info.idx = idx;
                 midi_out_proc.proc->set_chain_info(&info);
-                midi_out_with_tasks.push_back(midi_out_proc.proc);
+                midi_out_with_tasks.push_back({midi_out_proc.proc, false});
+            }
+            if (midi_out_proc.proc->has_fb_task()) {
+                Midi_processor_chain_info info;
+                info.chain = cable;
+                info.fn_list = &midi_in_proc_fns;
+                info.idx = idx;
+                midi_out_proc.proc->set_fb_chain_info(&info);
+                midi_out_with_tasks.push_back({midi_out_proc.proc, true});
             }
             midi_out_proc.proc->set_not_saved();
         }
@@ -274,17 +290,23 @@ rppicomidi::Midi_buffer* rppicomidi::Midi_processor_manager::filter_midi(Thread_
     return p_buf;
 }
 
-rppicomidi::Midi_buffer* rppicomidi::Midi_processor_manager::task(std::vector<Midi_processor*>& processors_with_tasks, Midi_buffer* p_buf)
+rppicomidi::Midi_buffer* rppicomidi::Midi_processor_manager::task(std::vector<Midi_processor_fn>& processors_with_tasks, bool is_feedback, Midi_buffer* p_buf)
 {
     mutex_enter_blocking(&processing_mutex);
     for (auto& proc: processors_with_tasks) {
-        proc->task();
+        if (proc.is_feedback != is_feedback)
+            continue;
+        if (is_feedback)
+            proc.proc->fb_task();
+        else
+            proc.proc->task();
+
         if (!p_buf->isEmpty()) {
-            auto info = proc->get_chain_info();
+            auto info = proc.proc->get_chain_info();
             auto fn_list = (*(info->fn_list))[info->chain];
             for (auto it= fn_list.begin() + info->idx+1; it != fn_list.end(); it++) {
                 auto process = *it;
-                process.proc->task();
+                process.proc->process();
             }
         }
     }
@@ -292,15 +314,25 @@ rppicomidi::Midi_buffer* rppicomidi::Midi_processor_manager::task(std::vector<Mi
     return p_buf;
  }
 
- rppicomidi::Midi_buffer* rppicomidi::Midi_processor_manager::run_midi_in_tasks()
- {
-    return task(midi_in_with_tasks, &proc_buf);
- }
+rppicomidi::Midi_buffer* rppicomidi::Midi_processor_manager::run_midi_in_tasks()
+{
+    return task(midi_in_with_tasks, false, &proc_buf);
+}
 
- rppicomidi::Midi_buffer* rppicomidi::Midi_processor_manager::run_midi_out_tasks()
- {
-    return task(midi_out_with_tasks, &fb_buf);
- }
+rppicomidi::Midi_buffer* rppicomidi::Midi_processor_manager::run_midi_out_fb_tasks()
+{
+    return task(midi_in_with_tasks, true, &proc_buf);
+}
+
+rppicomidi::Midi_buffer* rppicomidi::Midi_processor_manager::run_midi_out_tasks()
+{
+    return task(midi_out_with_tasks, false, &fb_buf);
+}
+
+rppicomidi::Midi_buffer* rppicomidi::Midi_processor_manager::run_midi_in_fb_tasks()
+{
+    return task(midi_in_with_tasks, true, &proc_buf);
+}
 
 bool rppicomidi::Midi_processor_manager::needs_store()
 {

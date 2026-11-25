@@ -22,7 +22,7 @@ Right now, the has_task() function returns false and is not declared virtual bec
 
 ## PUMP Processing Architecture Rev 2 Description
 The Rev 2 architecture was created to address the limiations of the Rev 1 architecture. The goals are:
-- Support multi-packet message generation from both MIDI Processors and task() functions.
+- Support multi-packet message generation from both MIDI Processors and task() (or fb_task()) functions.
 - Support allowing packets to switch virtual cable, and thus processing chain.
 - All packets generated for the same processing chain stay on that chain. That is, they will be passed to the next processor in the chain.
 - All packets generated for a new processing chain will be processed from the beginning of the new
@@ -44,7 +44,8 @@ If a task() function generates packets intended for the attached MIDI device, it
 them in the MIDI OUT buffer. If it generates packets intended for the host, it will generate them
 for the MIDI IN buffer. If the task() function generates a packet that should only be processed
 on the processing chain that contains the MIDI processor, and it will store the packet in the processing
-chain packet buffer for the chain that contains it.
+chain packet buffer for the chain that contains it. A processor may also have a fb_task() function that
+functions just like the task() function except it sends packets in the other direction.
 ```
 + ----------- +     + --------------- +     + ----------- +     + ---------------- +     + -------------- +
 |             |     |                 |     |             |     |                  |     |     Next       |
@@ -63,9 +64,9 @@ chain packet buffer for the chain that contains it.
 Each MIDI processor instance, therefore, has a reference two 4 different buffers: the source buffer and the
 processing chain packet buffer for the processing the process() function performs, and the source buffer
 and the processing chain packet buffer for the processing the feedback() function performs. The task() function
-may write to either source buffer or to the Processing Chain Packet Buffer for the process() function. There
-is currently no concept of a feedback task function; a task() that generates packets for the direction opposite
-to that of its process() function output should write to the packet source buffer for that direction.
+may write to either source buffer or to the Processing Chain Packet Buffer for the process() function. The
+fb_task() function may write to either source buffer or to the Processing Chain Packet Buffer for the feedback()
+function.
 
 ### PUMP Processing Architecture Rev 2 Hazard
 Consider processing chain A that contains a MIDI Processor that generates a packet on processing chain B.

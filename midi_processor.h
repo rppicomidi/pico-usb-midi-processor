@@ -295,6 +295,7 @@ public:
         return channel;
     }
     void set_chain_info(Midi_processor_chain_info* info) { chain_info = *info;}
+    void set_fb_chain_info(Midi_processor_chain_info* info) { fb_chain_info = *info;}
     const Midi_processor_chain_info* get_chain_info() const {return &chain_info; }
 protected:
     static const uint8_t max_name_length=21;
@@ -308,5 +309,6 @@ protected:
     Midi_buffer* fb_buf;
     Thread_safe_midi_buffer* out_buf;
     Midi_processor_chain_info chain_info;
+    Midi_processor_chain_info fb_chain_info;
 };
 }

@@ -210,11 +210,25 @@ public:
     Midi_buffer* run_midi_in_tasks();
 
     /**
+     * @brief run all feeback tasks that output to proc_buf
+     *
+     * @return a pointer to proc_buf
+     */
+    Midi_buffer* run_midi_out_fb_tasks();
+
+    /**
      * @brief run all tasks that output to fb_buf
      *
      * @return a pointer to fb_buf
      */
     Midi_buffer* run_midi_out_tasks();
+
+    /**
+     * @brief run all feedback tasks that output to fb_buf
+     *
+     * @return a pointer to fb_buf
+     */
+    Midi_buffer* run_midi_in_fb_tasks();
 
     /**
      * @brief Set the screen object
@@ -326,7 +340,7 @@ private:
      * @brief execute the task() functions for all Midi_processor objects
      * that have a task() function that does anything
      */
-    Midi_buffer* task(std::vector<Midi_processor*>& processors_with_tasks, Midi_buffer* task);
+    Midi_buffer* task(std::vector<Midi_processor_fn>& processors_with_tasks, bool is_feedback, Midi_buffer* task);
 
     struct Mpf_element {
         const char* name;
@@ -344,8 +358,8 @@ private:
     std::vector<std::vector<Mpv_element>> midi_out_processors;
     std::vector<std::vector<Midi_processor_fn>> midi_in_proc_fns;
     std::vector<std::vector<Midi_processor_fn>> midi_out_proc_fns;
-    std::vector<Midi_processor*> midi_in_with_tasks;
-    std::vector<Midi_processor*> midi_out_with_tasks;
+    std::vector<Midi_processor_fn> midi_in_with_tasks;
+    std::vector<Midi_processor_fn> midi_out_with_tasks;
     Mono_graphics* screen;
     //Settings_file settings_file;
     Setting_number<uint8_t> current_preset;

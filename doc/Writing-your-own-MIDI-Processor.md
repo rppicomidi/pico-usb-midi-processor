@@ -91,7 +91,7 @@ for your processor.
 I recommend that you name your files `midi_processor_????.cpp/h`, where `????` describes
 what your processor does.
 
-### Data In and Out, process(), task() and feedback()
+### Data In and Out, process(), task(), feedback() and fb_task()
 The MIDI Processor `process()` function gets a packet to process by calling `proc_buf->pop()`.
 
 The `process()` function may generate 0 outputs to filter out packets. It may generate
@@ -126,6 +126,13 @@ function instead of the `process()` function.
 the current chain.
 - It uses the 'in_buf' to pass packets to the start of a new chain the the opposite direction
 from the current chain.
+
+The MIDI Processor `fb_task()` function generates output packets like the task() function
+does. However, the `fb_task()` function generates packets to the same buffers as the feedback()
+function. For example, a processor that turns on clock generation to the attached MIDI device
+in response to a message from the attached MIDI device would implement the process() function
+to handle the message to start clock generation and fb_task() to generate the clock output
+messages.
 
 ### Settings implementation
 The `lib/pico-mono-ui-lib` directory contains a number of settings classes. Values that your

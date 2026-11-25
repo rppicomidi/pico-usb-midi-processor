@@ -86,6 +86,8 @@ public:
     void task();
     void clone_complete_cb();
     void poll_midi_dev_rx();
+    void send_buffer_to_attached_device(Midi_buffer* buf);
+    void send_buffer_to_host_computer(Midi_buffer* buf);
 
     const uint8_t OLED_ADDR=0x3c;   // the OLED I2C address as a constant
     uint8_t addr[1];                // the OLED I2C address is stored here
@@ -163,6 +165,22 @@ rppicomidi::Pico_usb_midi_processor::Pico_usb_midi_processor()  : addr{OLED_ADDR
     assert(success);
 }
 
+void rppicomidi::Pico_usb_midi_processor::send_buffer_to_attached_device(Midi_buffer* buf)
+{
+    Midi_packet pkt;
+    // All processing in the chain is complete; send any packets still in the chain
+    while(buf->pop(pkt)) {
+        if (!tuh_midi_can_write_stream(midi_dev_addr)) {
+            // USB endpoint write buffer is full; try flushing the buffer and then retry packet write
+            tuh_midi_stream_flush(midi_dev_addr);
+            while (!tuh_midi_can_write_stream(midi_dev_addr)) {
+                //tuh_task() is called from the other processor core
+            }
+        }
+        tuh_midi_packet_write(midi_dev_addr, pkt.getPacketBuffer());
+    }
+}
+
 void rppicomidi::Pico_usb_midi_processor::poll_midi_dev_rx()
 {
     // device must be attached and have at least one endpoint ready to receive a message
@@ -180,17 +198,7 @@ void rppicomidi::Pico_usb_midi_processor::poll_midi_dev_rx()
     while(pkts_remaining > 0) {
         Midi_packet pkt;
         auto buf = rppicomidi::Midi_processor_manager::instance().filter_midi_out();
-        // All processing in the chain is complete; send any packets still in the chain
-        while(buf->pop(pkt)) {
-            if (!tuh_midi_can_write_stream(midi_dev_addr)) {
-                // USB endpoint write buffer is full; try flushing the buffer and then retry packet write
-                tuh_midi_stream_flush(midi_dev_addr);
-                while (!tuh_midi_can_write_stream(midi_dev_addr)) {
-                    //tuh_task() is called from the other processor core
-                }
-            }
-            tuh_midi_packet_write(midi_dev_addr, pkt.getPacketBuffer());
-        }
+        send_buffer_to_attached_device(buf);
         from_host.lock();
         pkts_remaining = from_host.getSize();
         from_host.unlock();
@@ -219,19 +227,9 @@ void rppicomidi::Pico_usb_midi_processor::task()
         if (tud_midi_mounted()) {
             poll_midi_dev_rx();
             auto buf = rppicomidi::Midi_processor_manager::instance().run_midi_out_tasks();
-            Midi_packet pkt;
-            // All processing in the chain is complete; send any packets still in the chain
-            while(buf->pop(pkt)) {
-                if (!tuh_midi_can_write_stream(midi_dev_addr)) {
-                    // USB endpoint write buffer is full; try flushing the buffer and then retry packet write
-                    tuh_midi_stream_flush(midi_dev_addr);
-                    while (!tuh_midi_can_write_stream(midi_dev_addr)) {
-                        //tuh_task() is called on the other processor core
-                    }
-                }
-                tuh_midi_packet_write(midi_dev_addr, pkt.getPacketBuffer());
-            }
-
+            send_buffer_to_attached_device(buf);
+            buf = rppicomidi::Midi_processor_manager::instance().run_midi_in_fb_tasks();
+            send_buffer_to_attached_device(buf);
         }
     }
     else if (midi_device_status == MIDI_DEVICE_MSC_ATTACHED) {
@@ -264,6 +262,23 @@ void rppicomidi::Pico_usb_midi_processor::task()
         previous_timestamp = now;
     }
 }
+void rppicomidi::Pico_usb_midi_processor::send_buffer_to_host_computer(Midi_buffer* buf)
+{
+    if (!buf->isEmpty()) {
+        Midi_packet pkt;
+        while(buf->pop(pkt)) {
+            // Send  packets to the attached MIDI Device
+            if (!tud_midi_packet_write(pkt.getPacketBuffer())) {
+                // packet writes will flush the buffer automatically. Just need to poll until the transfer is complete
+                while(!tud_midi_can_write_packet()) {
+                    //tud_task() is called from the other processor core
+                }
+                // the write will succeed now
+                tud_midi_packet_write(pkt.getPacketBuffer());
+            }
+        }
+    }
+}
 
 //
 // Below here are standard C code functions that glue the Pico SDK and
@@ -291,38 +306,15 @@ static void midi_host_app_task(void)
             Midi_packet pkt;
             auto buf = rppicomidi::Midi_processor_manager::instance().filter_midi_in();
             // All processing in the chain is complete; send any packets still in the chain to the USB Device port
-            while(buf->pop(pkt)) {
-                //printf("packet received from MIDI Device 0x%08lx, filter output buf size=%u\r\n", pkt.getPacket(), buf->getSize());
-                // Send  packets to the attached MIDI Device
-                if (!tud_midi_packet_write(pkt.getPacketBuffer())) {
-                    // packet writes will flush the buffer automatically. Just need to poll until the transfer is complete
-                    while(!tud_midi_can_write_packet()) {
-                        //tud_task() is called from the other processor core
-                    }
-                    // the write will succeed now
-                    tud_midi_packet_write(pkt.getPacketBuffer());
-                }
-            }
+            rppicomidi::Pico_usb_midi_processor::instance().send_buffer_to_host_computer(buf);
             rppicomidi::Pico_usb_midi_processor::instance().from_dev.lock();
             pkts_remaining = rppicomidi::Pico_usb_midi_processor::instance().from_dev.getSize();
             rppicomidi::Pico_usb_midi_processor::instance().from_dev.unlock();
         }
         // Next execute all processors that have a task that sent packets to the host computer's MIDI IN
         auto buf = rppicomidi::Midi_processor_manager::instance().run_midi_in_tasks();
-        if (!buf->isEmpty()) {
-            Midi_packet pkt;
-            while(buf->pop(pkt)) {
-                // Send  packets to the attached MIDI Device
-                if (!tud_midi_packet_write(pkt.getPacketBuffer())) {
-                    // packet writes will flush the buffer automatically. Just need to poll until the transfer is complete
-                    while(!tud_midi_can_write_packet()) {
-                        //tud_task() is called from the other processor core
-                    }
-                    // the write will succeed now
-                    tud_midi_packet_write(pkt.getPacketBuffer());
-                }
-            }
-        }
+        rppicomidi::Pico_usb_midi_processor::instance().send_buffer_to_host_computer(buf);
+        buf = rppicomidi::Midi_processor_manager::instance().run_midi_out_fb_tasks();
         // Finally, flush the MIDI Host output stream buffer
         tuh_midi_stream_flush(dev_addr);
     }
