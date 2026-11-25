@@ -1,19 +1,11 @@
 /**
- * @file midi_processor_chan_mes_remap_settings_view.cpp
+ * @file midi_processor_clock_generator_settings_view.cpp
  * @author rppicomidi
- * @brief Settings UI for channel message remap
- *
- * The UI looks like this:
- *      7-bit or 14-bit
- *      Channel: 1
- *      Display Hex
- *      PB Chan->CC:01->1B
- *      PB Chan->CC:02->2B
- *      Add New PB Chan->CC
+ * @brief Settings UI for the MIDI clock generator
  * 
  * MIT License
  *
- * Copyright (c) 2022 rppicomidi
+ * Copyright (c) 2026 rppicomidi
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal

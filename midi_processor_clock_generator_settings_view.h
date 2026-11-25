@@ -1,5 +1,5 @@
 /**
- * @brief this class provides the UI for setting up channel message remap
+ * @brief this class provides the UI for setting up the MIDI Clock Generator
  * 
  */
 
